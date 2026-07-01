@@ -1,0 +1,231 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #1E1E24;
+  --card-bg: #2A2A32;
+  --ink: #E0E0E6;
+  --line: #3F3F4A;
+  --accent-blue: #00D1FF;
+  --accent-green: #50FA7B;
+  --accent-amber: #FFB86C;
+  --f-mono: 'Courier New', Courier, monospace;
+  --f-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+body, html {
+  background-color: var(--bg);
+  font-family: var(--f-sans);
+  color: var(--ink);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#root {
+  height: 100%;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: 60px 1fr;
+  height: 100vh;
+}
+
+.header-bar {
+  grid-column: 1 / span 2;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: #16161C;
+}
+
+.sidebar {
+  border-right: 1px solid var(--line);
+  padding: 20px;
+  background: #18181F;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+}
+
+.main-content {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kpi-card {
+  background: var(--card-bg);
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.kpi-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.kpi-value {
+  font-family: var(--f-mono);
+  font-size: 22px;
+  font-weight: bold;
+}
+
+.kpi-value.green { color: var(--accent-green); }
+.kpi-value.blue { color: var(--accent-blue); }
+.kpi-value.amber { color: var(--accent-amber); }
+.kpi-value.white { color: #fff; }
+
+.chart-container {
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 16px;
+}
+
+.chart-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  border-left: 3px solid var(--accent-blue);
+  padding-left: 8px;
+  color: var(--ink);
+}
+
+.filter-group label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #666;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.btn-tab {
+  background: #222;
+  border: 1px solid var(--line);
+  color: #ccc;
+  width: 100%;
+  padding: 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-tab.active {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.btn-tab:hover:not(.active) {
+  background: #2c2c36;
+}
+
+.grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.grid-table th {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+  color: #888;
+  font-weight: normal;
+}
+
+.grid-table td {
+  padding: 8px;
+  border-bottom: 1px solid #333;
+  font-family: var(--f-mono);
+  color: var(--ink);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.status-good {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+}
+
+.status-bad {
+  background: var(--accent-amber);
+  box-shadow: 0 0 8px var(--accent-amber);
+}
+
+.tag-192 {
+  color: var(--accent-green);
+  font-family: var(--f-mono);
+  font-size: 10px;
+}
+
+.math-hint {
+  font-size: 10px;
+  color: #555;
+  font-style: italic;
+  margin-top: 10px;
+  border-top: 1px dashed #444;
+  padding-top: 5px;
+}
+
+.markdown-body {
+  font-family: var(--f-sans);
+  color: #ddd;
+}
+
+.markdown-body p {
+  margin-bottom: 0.75rem;
+}
+
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.markdown-body ul, .markdown-body ol {
+  margin-left: 1.25rem;
+  margin-bottom: 0.75rem;
+  list-style-position: outside;
+}
+
+.markdown-body ul {
+  list-style-type: disc;
+}
+
+.markdown-body ol {
+  list-style-type: decimal;
+}
+
+.markdown-body li {
+  margin-bottom: 0.25rem;
+}
