@@ -2,6 +2,7 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import { Vonage } from '@vonage/server-sdk';
 import { Auth } from '@vonage/auth';
+import { WhatsAppTemplate, WhatsAppText, WhatsAppLanguageCode } from '@vonage/messages';
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -39,6 +40,13 @@ app.post("/api/notify", async (req, res) => {
 
     const pk = rawPrivateKey.replace(/\\n/g, '\n');
 
+    // Mensagens de WhatsApp iniciadas pela empresa (fora de uma janela de
+    // conversa ativa de 24h) só são entregues pela Meta se usarem um Message
+    // Template pré-aprovado. Sem um template configurado, caímos de volta
+    // para texto livre, que só funciona dentro dessa janela de 24h.
+    const templateName = process.env.VONAGE_WHATSAPP_TEMPLATE_NAME;
+    const templateLocale = (process.env.VONAGE_WHATSAPP_TEMPLATE_LOCALE || WhatsAppLanguageCode.PORTUGUESE_BR) as WhatsAppLanguageCode;
+
     try {
       const dynamicVonage = new Vonage(new Auth({ apiKey, apiSecret, applicationId, privateKey: pk }));
 
@@ -50,13 +58,26 @@ app.post("/api/notify", async (req, res) => {
 
       for (const targetPhone of phones) {
         try {
-          await dynamicVonage.messages.send({
-            to: targetPhone,
-            from: from,
-            channel: 'whatsapp',
-            messageType: 'text',
-            text: `🚨 ALERTA DE ANOMALIA - ${sector}\n\n${message}`
-          } as any);
+          if (templateName) {
+            await dynamicVonage.messages.send(new WhatsAppTemplate({
+              to: targetPhone,
+              from: from,
+              whatsapp: {
+                policy: 'deterministic',
+                locale: templateLocale,
+              },
+              template: {
+                name: templateName,
+                parameters: [sector, message],
+              },
+            }));
+          } else {
+            await dynamicVonage.messages.send(new WhatsAppText({
+              to: targetPhone,
+              from: from,
+              text: `🚨 ALERTA DE ANOMALIA - ${sector}\n\n${message}`,
+            }));
+          }
           results.push({ phone: targetPhone, status: 'success', channel: 'whatsapp' });
           hasSuccess = true;
         } catch (wppError: any) {
