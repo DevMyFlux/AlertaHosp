@@ -26,10 +26,15 @@ app.post("/api/notify", async (req, res) => {
 
     const apiKey = process.env.VONAGE_API_KEY;
     const apiSecret = process.env.VONAGE_API_SECRET;
-    // appId/privateKey podem vir da tela de Configurações (armazenados no
-    // navegador do usuário) ou das variáveis de ambiente do servidor.
-    const applicationId = appId || process.env.VONAGE_APPLICATION_ID;
-    const rawPrivateKey = privateKey || process.env.VONAGE_PRIVATE_KEY;
+    // As variáveis de ambiente do servidor têm prioridade: são a fonte
+    // confiável e mantida atualizada. appId/privateKey salvos no navegador
+    // (tela de Configurações) só são usados como fallback, quando o
+    // servidor não tem credenciais configuradas — caso contrário um valor
+    // antigo salvo ali (de testes passados) sobrescreveria silenciosamente
+    // a configuração correta, causando falha na Application/template sem
+    // erro aparente.
+    const applicationId = process.env.VONAGE_APPLICATION_ID || appId;
+    const rawPrivateKey = process.env.VONAGE_PRIVATE_KEY || privateKey;
 
     if (!apiKey || !apiSecret || !applicationId || !rawPrivateKey) {
       res.status(500).json({
