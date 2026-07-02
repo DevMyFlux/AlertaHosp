@@ -2,7 +2,7 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import { Vonage } from '@vonage/server-sdk';
 import { Auth } from '@vonage/auth';
-import { WhatsAppTemplate, WhatsAppText, WhatsAppLanguageCode } from '@vonage/messages';
+import { WhatsAppTemplate, WhatsAppLanguageCode } from '@vonage/messages';
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -42,42 +42,41 @@ app.post("/api/notify", async (req, res) => {
 
     // Mensagens de WhatsApp iniciadas pela empresa (fora de uma janela de
     // conversa ativa de 24h) só são entregues pela Meta se usarem um Message
-    // Template pré-aprovado. Sem um template configurado, caímos de volta
-    // para texto livre, que só funciona dentro dessa janela de 24h.
-    const templateName = process.env.VONAGE_WHATSAPP_TEMPLATE_NAME;
+    // Template pré-aprovado, referenciado como "namespace:nome_do_template"
+    // (a WABA vinculada ao número já tem o template "sistema_de_alerta"
+    // aprovado e em uso pelo sistema legado em Java).
+    const templateNamespace = process.env.VONAGE_WHATSAPP_TEMPLATE_NAMESPACE || '678e6487_99c4_4e6d_995c_3dab76a2438b';
+    const templateNameOnly = process.env.VONAGE_WHATSAPP_TEMPLATE_NAME || 'sistema_de_alerta';
+    const templateName = `${templateNamespace}:${templateNameOnly}`;
     const templateLocale = (process.env.VONAGE_WHATSAPP_TEMPLATE_LOCALE || WhatsAppLanguageCode.PORTUGUESE_BR) as WhatsAppLanguageCode;
+    const horaFormatada = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    // Parâmetros de template do WhatsApp não podem conter quebras de linha
+    // nem espaços múltiplos, ou a Meta rejeita a mensagem.
+    const toTemplateParam = (value: string) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
     try {
       const dynamicVonage = new Vonage(new Auth({ apiKey, apiSecret, applicationId, privateKey: pk }));
 
       // We will try to send to multiple numbers if 'phone' is a comma separated string
-      const phones = phone ? phone.split(',').map((p: string) => p.trim()) : [to, '551186510453'];
+      const phones = phone ? phone.split(',').map((p: string) => p.trim()) : [to, '551186510453', '5511949102183'];
 
       const results = [];
       let hasSuccess = false;
 
       for (const targetPhone of phones) {
         try {
-          if (templateName) {
-            await dynamicVonage.messages.send(new WhatsAppTemplate({
-              to: targetPhone,
-              from: from,
-              whatsapp: {
-                policy: 'deterministic',
-                locale: templateLocale,
-              },
-              template: {
-                name: templateName,
-                parameters: [sector, message],
-              },
-            }));
-          } else {
-            await dynamicVonage.messages.send(new WhatsAppText({
-              to: targetPhone,
-              from: from,
-              text: `🚨 ALERTA DE ANOMALIA - ${sector}\n\n${message}`,
-            }));
-          }
+          await dynamicVonage.messages.send(new WhatsAppTemplate({
+            to: targetPhone,
+            from: from,
+            whatsapp: {
+              policy: 'deterministic',
+              locale: templateLocale,
+            },
+            template: {
+              name: templateName,
+              parameters: [horaFormatada, toTemplateParam(sector), toTemplateParam(message)],
+            },
+          }));
           results.push({ phone: targetPhone, status: 'success', channel: 'whatsapp' });
           hasSuccess = true;
         } catch (wppError: any) {
