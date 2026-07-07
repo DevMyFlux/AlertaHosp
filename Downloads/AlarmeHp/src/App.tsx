@@ -50,7 +50,7 @@ export default function App() {
         const privateKey = localStorage.getItem('vonage_private_key') || '';
         const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
 
-        await fetch('/api/notify', {
+        const notifyResponse = await fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -62,6 +62,11 @@ export default function App() {
             whatsappFrom
           })
         });
+        const notifyData = await notifyResponse.json();
+        const smsFallback = (notifyData.results || []).find((r: any) => r.channel === 'sms' && r.whatsappError);
+        if (smsFallback) {
+          console.warn("WhatsApp falhou, notificação caiu para SMS:", smsFallback.whatsappError);
+        }
       }
     } catch (error) {
       console.error("Erro na checagem automática de anomalias:", error);

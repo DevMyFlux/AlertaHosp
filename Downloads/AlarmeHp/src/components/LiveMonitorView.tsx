@@ -26,7 +26,14 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to send notification");
-      alert("Notificação enviada com sucesso!");
+
+      const smsFallback = (data.results || []).find((r: any) => r.channel === 'sms' && r.whatsappError);
+      if (smsFallback) {
+        console.warn("WhatsApp falhou, notificação caiu para SMS:", smsFallback.whatsappError);
+        alert(`Notificação enviada por SMS (WhatsApp falhou: ${smsFallback.whatsappError})`);
+      } else {
+        alert("Notificação enviada com sucesso!");
+      }
     } catch (e: any) {
       console.warn("Notification error:", e);
       alert(`Erro ao enviar notificação: ${e?.message || e}`);

@@ -17,6 +17,30 @@ const app = express();
 
 app.use(express.json());
 
+// O SDK da Vonage descarta o corpo da resposta HTTP em erros (só lança com
+// o status code), mas o corpo ainda não foi lido nesse ponto — conseguimos
+// ler nós mesmos pra saber o motivo real da rejeição (a Meta normalmente
+// responde { title, detail } explicando o porquê).
+async function extractVonageErrorDetail(error: any): Promise<string> {
+  const fallback = error?.message || String(error);
+  const response = error?.response;
+  if (!response || typeof response.text !== 'function') {
+    return fallback;
+  }
+  try {
+    const bodyText = await response.text();
+    if (!bodyText) return fallback;
+    try {
+      const body = JSON.parse(bodyText);
+      return body?.detail || body?.title || bodyText;
+    } catch {
+      return bodyText;
+    }
+  } catch {
+    return fallback;
+  }
+}
+
 // API route for WhatsApp / SMS Notifications
 app.post("/api/notify", async (req, res) => {
   try {
@@ -56,8 +80,9 @@ app.post("/api/notify", async (req, res) => {
     const templateLocale = (process.env.VONAGE_WHATSAPP_TEMPLATE_LOCALE || WhatsAppLanguageCode.PORTUGUESE_BR) as WhatsAppLanguageCode;
     const horaFormatada = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     // Parâmetros de template do WhatsApp não podem conter quebras de linha
-    // nem espaços múltiplos, ou a Meta rejeita a mensagem.
-    const toTemplateParam = (value: string) => String(value ?? '').replace(/\s+/g, ' ').trim();
+    // nem espaços múltiplos, ou a Meta rejeita a mensagem. Também truncamos
+    // no limite documentado da Meta (1024 caracteres) como proteção extra.
+    const toTemplateParam = (value: string) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 1024);
 
     try {
       const dynamicVonage = new Vonage(new Auth({ apiKey, apiSecret, applicationId, privateKey: pk }));
@@ -85,7 +110,8 @@ app.post("/api/notify", async (req, res) => {
           results.push({ phone: targetPhone, status: 'success', channel: 'whatsapp' });
           hasSuccess = true;
         } catch (wppError: any) {
-          console.warn(`WhatsApp failed for ${targetPhone}, falling back to SMS:`, wppError?.message || wppError);
+          const whatsappErrorDetail = await extractVonageErrorDetail(wppError);
+          console.warn(`WhatsApp failed for ${targetPhone}, falling back to SMS:`, whatsappErrorDetail);
 
           try {
             const smsResponse = await dynamicVonage.sms.send({
@@ -97,10 +123,15 @@ app.post("/api/notify", async (req, res) => {
             if (smsResponse.messages && smsResponse.messages[0].status !== '0') {
               throw new Error(smsResponse.messages[0]['error-text'] || smsResponse.messages[0].status);
             }
-            results.push({ phone: targetPhone, status: 'success', channel: 'sms' });
+            results.push({ phone: targetPhone, status: 'success', channel: 'sms', whatsappError: whatsappErrorDetail });
             hasSuccess = true;
           } catch (smsError: any) {
-            results.push({ phone: targetPhone, status: 'error', error: smsError?.message || String(smsError) });
+            results.push({
+              phone: targetPhone,
+              status: 'error',
+              error: smsError?.message || String(smsError),
+              whatsappError: whatsappErrorDetail
+            });
           }
         }
       }
@@ -122,6 +153,20 @@ app.post("/api/notify", async (req, res) => {
     console.warn("Notification Error:", errorMsg);
     res.status(500).json({ error: errorMsg });
   }
+});
+
+// A API de Mensagens da Vonage aceita o envio de forma síncrona (fila pra
+// entrega) e só informa o resultado real (entregue/rejeitado pela Meta) de
+// forma assíncrona, via webhook. Sem esses endpoints configurados na
+// aplicação Vonage, não há como saber por que uma mensagem foi rejeitada.
+app.post("/api/webhooks/vonage-status", (req, res) => {
+  console.warn("[Vonage status webhook]", JSON.stringify(req.body));
+  res.sendStatus(200);
+});
+
+app.post("/api/webhooks/vonage-inbound", (req, res) => {
+  console.warn("[Vonage inbound webhook]", JSON.stringify(req.body));
+  res.sendStatus(200);
 });
 
 // API route for Chat
