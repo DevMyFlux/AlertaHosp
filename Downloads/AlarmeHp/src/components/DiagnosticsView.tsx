@@ -1,41 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
+import { buildSectorBandStats, detectSectorAnomalies, SectorAnomaly } from '../lib/anomalyDetection';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send } from 'lucide-react';
 
 interface Props {
   data: ProcessedTelemetryData[];
 }
 
-type TimeBand = 'Café da Manhã (07-10h)' | 'Almoço (10-14h)' | 'Jantar (18-22h)' | 'Demais Horários';
-
-function getBand(hour: number): TimeBand {
-  if (hour >= 7 && hour < 10) return 'Café da Manhã (07-10h)';
-  if (hour >= 10 && hour < 14) return 'Almoço (10-14h)';
-  if (hour >= 18 && hour < 22) return 'Jantar (18-22h)';
-  return 'Demais Horários';
-}
-
-const SECTOR_MAPPING: Record<string, { label: string; sub?: string; type: string }> = {
-  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra' },
-  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico' },
-  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico' },
-  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra' },
-  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico' },
-  'SADT': { label: 'SADT', type: 'Crítico' },
-  'ME_UTI_QG_E3': { label: 'UTI QG', sub: 'ME_CLIM_UTI', type: 'Crítico' },
-  'ME_UTI_QD_IT': { label: 'UTI QD IT', sub: 'ME_CLIM_UTI', type: 'Crítico' },
-  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem' },
-  'DJ60_RM': { label: 'Ressonância', type: 'Imagem' },
-  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem' },
-  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem' },
-  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem' }
-};
-
 export function DiagnosticsView({ data }: Props) {
   const [hoursToAnalyze, setHoursToAnalyze] = useState(12);
   const [notifying, setNotifying] = useState<Record<string, boolean>>({});
 
-  const handleNotify = async (alertId: string, sector: string, diagnostic: string, action: string) => {
+  const handleNotify = async (alertId: string, sector: string, diagnostic: string, action: string, kwh: number) => {
     setNotifying(prev => ({ ...prev, [alertId]: true }));
     try {
       const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
@@ -43,10 +19,11 @@ export function DiagnosticsView({ data }: Props) {
       const privateKey = localStorage.getItem('vonage_private_key');
       const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
       const message = `Diagnóstico: ${diagnostic}\n\nAção: ${action}`;
+      const valor = Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(kwh);
       const response = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sector, message, phone, appId, privateKey, whatsappFrom })
+        body: JSON.stringify({ sector, message, valor, phone, appId, privateKey, whatsappFrom })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to send notification");
@@ -67,107 +44,16 @@ export function DiagnosticsView({ data }: Props) {
   };
 
   const { sectorStats, alerts } = useMemo(() => {
-    if (!data.length) return { sectorStats: {}, alerts: [] };
+    if (!data.length) return { sectorStats: {}, alerts: [] as SectorAnomaly[] };
 
-    // 1. Calculate historical behavior for ALL_SECTORS per band
-    const histData: Record<string, Record<TimeBand, number[]>> = {};
-    ALL_SECTORS.forEach(sec => {
-      histData[sec] = {
-        'Café da Manhã (07-10h)': [],
-        'Almoço (10-14h)': [],
-        'Jantar (18-22h)': [],
-        'Demais Horários': [],
-      };
-    });
+    const sStats = buildSectorBandStats(data);
 
-    data.forEach(row => {
-      const band = getBand(row.hour);
-      ALL_SECTORS.forEach(sec => {
-        const val = Number(row[sec]);
-        if (!isNaN(val) && val > 0) {
-          histData[sec][band].push(val);
-        }
-      });
-    });
-
-    const calcStats = (vals: number[]) => {
-      if (!vals.length) return { mean: 0, median: 0, stdDev: 0, min: 0, max: 0 };
-      const sorted = [...vals].sort((a, b) => a - b);
-      const sum = sorted.reduce((a, b) => a + b, 0);
-      const mean = sum / sorted.length;
-      const median = sorted[Math.floor(sorted.length / 2)];
-      const variance = sorted.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / sorted.length;
-      const stdDev = Math.sqrt(variance);
-      const min = sorted[0];
-      const max = sorted[sorted.length - 1];
-      return { mean, median, stdDev, min, max };
-    };
-
-    const sStats: Record<string, Record<TimeBand, any>> = {};
-    ALL_SECTORS.forEach(sec => {
-      sStats[sec] = {} as any;
-      (Object.keys(histData[sec]) as TimeBand[]).forEach(band => {
-        sStats[sec][band] = calcStats(histData[sec][band]);
-      });
-    });
-
-    // 2. Look at the last N elements
+    // Look at the last N elements
     const readingsPerHour = 4; // 15 min intervals
     const elementsToAnalyze = hoursToAnalyze * readingsPerHour;
     const recentData = data.slice(-elementsToAnalyze);
 
-    const activeAlerts: any[] = [];
-
-    recentData.forEach(row => {
-      const band = getBand(row.hour);
-      const dateStr = row.timestamp.split(/[T ]/)[0];
-
-      Object.keys(SECTOR_MAPPING).forEach(sec => {
-        const actualKey = ALL_SECTORS.find(k => k.includes(sec)) || sec;
-        const val = Number(row[actualKey]);
-        const s = sStats[actualKey]?.[band];
-        
-        if (!s || s.mean === 0) return;
-
-        const upperLimit = s.mean + (1.5 * s.stdDev);
-        
-        if (val > upperLimit && val > 5) {
-          const deviation = ((val - upperLimit) / upperLimit) * 100;
-          if (deviation > 10) { 
-            let severity = 'Moderado';
-            if (deviation > 50) severity = 'Crítico';
-            else if (deviation > 20) severity = 'Alto';
-
-            const mapInfo = SECTOR_MAPPING[sec];
-            let subVal = 0;
-            let subMedian = 1;
-            let actualSubKey = '';
-            
-            if (mapInfo.sub) {
-              actualSubKey = ALL_SECTORS.find(k => k.includes(mapInfo.sub!)) || mapInfo.sub;
-              subVal = Number(row[actualSubKey]) || 0;
-              subMedian = sStats[actualSubKey]?.[band]?.median || 1;
-            }
-
-            activeAlerts.push({
-              date: dateStr,
-              time: row.time,
-              band,
-              sectorName: mapInfo.label,
-              sectorKey: actualKey,
-              type: mapInfo.type,
-              val,
-              expectedMax: upperLimit,
-              deviation,
-              severity,
-              subVal,
-              subMedian,
-              subName: actualSubKey,
-            });
-          }
-        }
-      });
-    });
+    const activeAlerts = recentData.flatMap(row => detectSectorAnomalies(row, sStats));
 
     // Reverse sort by severity/deviation and limit to top 15 so it's not overwhelming
     activeAlerts.sort((a, b) => b.deviation - a.deviation);
@@ -378,7 +264,7 @@ export function DiagnosticsView({ data }: Props) {
 
                       <div className="pt-2">
                         <button 
-                          onClick={() => handleNotify(mainAlert.sectorKey + mainAlert.time, mainAlert.sectorName, diagnosticText, actionText)}
+                          onClick={() => handleNotify(mainAlert.sectorKey + mainAlert.time, mainAlert.sectorName, diagnosticText, actionText, mainAlert.val)}
                           disabled={notifying[mainAlert.sectorKey + mainAlert.time]}
                           className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-md border border-blue-500/30 transition-colors text-xs font-medium"
                         >

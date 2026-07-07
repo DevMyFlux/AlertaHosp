@@ -56,6 +56,7 @@ export default function App() {
           body: JSON.stringify({
             message: result.message,
             sector: result.sector,
+            valor: typeof result.valorKwh === 'number' ? result.valorKwh : undefined,
             phone,
             appId,
             privateKey,

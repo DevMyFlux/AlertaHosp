@@ -41,10 +41,26 @@ async function extractVonageErrorDetail(error: any): Promise<string> {
   }
 }
 
+// O corpo fixo do template "sistema_de_alerta" espera um número de kWh puro
+// em {{3}} (ex: "5,6"), não um parágrafo — ver toTemplateParam/{{3}} abaixo.
+// `valor` é o dado limpo que LiveMonitorView/DiagnosticsView já têm
+// (leitura de telemetria); quando ausente (ex: alerta gerado pela IA em
+// App.tsx), tentamos extrair o primeiro número presente na mensagem antes
+// de recorrer a um placeholder.
+function resolveKwhParam(valor: unknown, message: string): string {
+  const trimmedValor = typeof valor === 'string' ? valor.trim() : valor;
+  if (trimmedValor !== undefined && trimmedValor !== null && trimmedValor !== '') {
+    return String(trimmedValor).replace(/\s+/g, ' ').trim().slice(0, 1024);
+  }
+  const match = String(message ?? '').match(/-?\d+(?:[.,]\d+)?/);
+  if (match) return match[0];
+  return 'N/D';
+}
+
 // API route for WhatsApp / SMS Notifications
 app.post("/api/notify", async (req, res) => {
   try {
-    const { message, sector, phone, appId, privateKey, whatsappFrom } = req.body;
+    const { message, sector, valor, phone, appId, privateKey, whatsappFrom } = req.body;
     const to = phone || '5511949102183'; // Default se não for enviado
     const from = whatsappFrom || '556298792013'; // Sender for WhatsApp
 
@@ -104,7 +120,7 @@ app.post("/api/notify", async (req, res) => {
             },
             template: {
               name: templateName,
-              parameters: [horaFormatada, toTemplateParam(sector), toTemplateParam(message)],
+              parameters: [horaFormatada, toTemplateParam(sector), resolveKwhParam(valor, message)],
             },
           }));
           results.push({ phone: targetPhone, status: 'success', channel: 'whatsapp' });
@@ -225,7 +241,9 @@ app.post("/api/check-anomalies", async (req, res) => {
     const systemInstruction = `Você é um Engenheiro de Dados especialista em Eficiência Energética.
 Analise os dados de telemetria mais recentes fornecidos.
 Se houver alguma anomalia clara (ex: pico excessivo de consumo, consumo alto fora do padrão ou em horários atípicos), retorne um JSON EXATAMENTE neste formato:
-{ "hasAnomaly": true, "sector": "Nome do Setor", "message": "Descrição da anomalia identificada com valores em kWh. Recomende uma ação." }
+{ "hasAnomaly": true, "sector": "Nome do Setor", "message": "Descrição da anomalia identificada com valores em kWh. Recomende uma ação.", "valorKwh": 5.6 }
+
+O campo "valorKwh" deve ser o valor numérico (sem unidade, use ponto como separador decimal) de consumo em kWh que caracterizou a anomalia.
 
 Se os dados estiverem normais e dentro do padrão, retorne:
 { "hasAnomaly": false }
