@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { buildSectorBandStats, detectSectorAnomalies, SectorAnomaly } from '../lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, SectorAnomaly } from '../lib/anomalyDetection';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send } from 'lucide-react';
 
 interface Props {
@@ -11,7 +11,7 @@ export function DiagnosticsView({ data }: Props) {
   const [hoursToAnalyze, setHoursToAnalyze] = useState(12);
   const [notifying, setNotifying] = useState<Record<string, boolean>>({});
 
-  const handleNotify = async (alertId: string, sector: string, diagnostic: string, action: string, kwh: number) => {
+  const handleNotify = async (alertId: string, sector: string, diagnostic: string, action: string, kwh: number, expectedMax: number, severity: string) => {
     setNotifying(prev => ({ ...prev, [alertId]: true }));
     try {
       const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
@@ -19,11 +19,12 @@ export function DiagnosticsView({ data }: Props) {
       const privateKey = localStorage.getItem('vonage_private_key');
       const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
       const message = `Diagnóstico: ${diagnostic}\n\nAção: ${action}`;
-      const valor = Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(kwh);
+      const sectorParam = formatSectorParam(sector, severity);
+      const valor = formatValorParam(kwh, expectedMax);
       const response = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sector, message, valor, phone, appId, privateKey, whatsappFrom })
+        body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to send notification");
@@ -264,7 +265,7 @@ export function DiagnosticsView({ data }: Props) {
 
                       <div className="pt-2">
                         <button 
-                          onClick={() => handleNotify(mainAlert.sectorKey + mainAlert.time, mainAlert.sectorName, diagnosticText, actionText, mainAlert.val)}
+                          onClick={() => handleNotify(mainAlert.sectorKey + mainAlert.time, mainAlert.sectorName, diagnosticText, actionText, mainAlert.val, mainAlert.expectedMax, mainAlert.severity)}
                           disabled={notifying[mainAlert.sectorKey + mainAlert.time]}
                           className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-md border border-blue-500/30 transition-colors text-xs font-medium"
                         >

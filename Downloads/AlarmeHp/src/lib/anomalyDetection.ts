@@ -100,6 +100,21 @@ export interface SectorAnomaly {
   subName: string;
 }
 
+const kwhFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+
+// Monta os parâmetros {{2}} (setor) e {{3}} (valor) do template WhatsApp
+// "sistema_de_alerta" com o máximo de contexto possível sem alterar o texto
+// fixo aprovado — o setor ganha a severidade entre parênteses, e o valor
+// ganha o limite esperado e o desvio percentual.
+export function formatSectorParam(sectorName: string, severity: string): string {
+  return `${sectorName} (${severity})`;
+}
+
+export function formatValorParam(val: number, expectedMax: number): string {
+  const deviationPct = expectedMax > 0 ? Math.round(((val - expectedMax) / expectedMax) * 100) : 0;
+  return `${kwhFormatter.format(val)} (limite ${kwhFormatter.format(expectedMax)}, +${deviationPct}%)`;
+}
+
 // Avalia os setores conhecidos (SECTOR_MAPPING) em uma única linha de
 // telemetria contra as estatísticas históricas do turno correspondente.
 // Usado tanto para varrer várias linhas (histórico) quanto uma só (snapshot
