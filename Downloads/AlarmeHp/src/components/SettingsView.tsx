@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Phone, Key, FileText } from 'lucide-react';
+import { Settings, Save, Phone, Key, FileText, Plus, X } from 'lucide-react';
 
 export function SettingsView() {
-  const [phoneNumber, setPhoneNumber] = useState('5511949102183');
+  const [phoneNumbers, setPhoneNumbers] = useState<string[]>(['5511949102183']);
+  const [newPhoneInput, setNewPhoneInput] = useState('');
   const [appId, setAppId] = useState('');
   const [privateKey, setPrivateKey] = useState('');
   const [whatsappFrom, setWhatsappFrom] = useState('556298792013');
 
   useEffect(() => {
     const saved = localStorage.getItem('notify_phone_number');
-    if (saved) setPhoneNumber(saved);
-    
+    if (saved) {
+      const list = saved.split(',').map(p => p.trim()).filter(Boolean);
+      if (list.length) setPhoneNumbers(list);
+    }
+
     const savedAppId = localStorage.getItem('vonage_app_id');
     if (savedAppId) setAppId(savedAppId);
-    
+
     const savedKey = localStorage.getItem('vonage_private_key');
     if (savedKey) setPrivateKey(savedKey);
 
@@ -21,8 +25,22 @@ export function SettingsView() {
     if (savedFrom) setWhatsappFrom(savedFrom);
   }, []);
 
+  const handleAddPhone = () => {
+    const cleaned = newPhoneInput.replace(/\D/g, '');
+    if (!cleaned || phoneNumbers.includes(cleaned)) {
+      setNewPhoneInput('');
+      return;
+    }
+    setPhoneNumbers(prev => [...prev, cleaned]);
+    setNewPhoneInput('');
+  };
+
+  const handleRemovePhone = (num: string) => {
+    setPhoneNumbers(prev => prev.filter(p => p !== num));
+  };
+
   const handleSave = () => {
-    localStorage.setItem('notify_phone_number', phoneNumber);
+    localStorage.setItem('notify_phone_number', phoneNumbers.join(','));
     localStorage.setItem('vonage_app_id', appId);
     localStorage.setItem('vonage_private_key', privateKey);
     localStorage.setItem('vonage_whatsapp_from', whatsappFrom);
@@ -48,17 +66,47 @@ export function SettingsView() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">
-                Número de Destino (com DDI e DDD)
+                Números de Destino (com DDI e DDD)
               </label>
-              <input
-                type="text"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-                placeholder="Ex: 5511949102183"
-                className="w-full bg-[#1A1A1A] border border-[#333] rounded-md px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-              />
+
+              <div className="space-y-2 mb-3">
+                {phoneNumbers.map((num) => (
+                  <div key={num} className="flex items-center justify-between bg-[#1A1A1A] border border-[#333] rounded-md px-4 py-2">
+                    <span className="text-white font-mono text-sm">{num}</span>
+                    <button
+                      onClick={() => handleRemovePhone(num)}
+                      className="text-gray-500 hover:text-red-400 transition-colors"
+                      title="Remover destinatário"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {phoneNumbers.length === 0 && (
+                  <p className="text-xs text-amber-500">Nenhum destinatário cadastrado — os alertas não terão para onde ir.</p>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newPhoneInput}
+                  onChange={(e) => setNewPhoneInput(e.target.value.replace(/\D/g, ''))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddPhone(); } }}
+                  placeholder="Ex: 5511949102183"
+                  className="flex-1 bg-[#1A1A1A] border border-[#333] rounded-md px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={handleAddPhone}
+                  className="flex items-center gap-1 px-3 py-2 bg-[#1A1A1A] border border-[#333] hover:border-blue-500 text-gray-300 rounded-md text-sm transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar
+                </button>
+              </div>
+
               <p className="text-xs text-gray-500 mt-2">
-                Este número receberá os alertas gerados pela IA via WhatsApp ou SMS (fallback).
+                Todos os números acima recebem os alertas gerados pela IA via WhatsApp ou SMS (fallback).
               </p>
             </div>
 
