@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, SectorAnomaly } from '../lib/anomalyDetection';
+import { formatSectorParam, formatValorParam } from '../lib/anomalyDetection';
+import { getAlertLogSince } from '../lib/alertLog';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send } from 'lucide-react';
 
 interface Props {
@@ -44,24 +45,18 @@ export function DiagnosticsView({ data }: Props) {
     }
   };
 
-  const { sectorStats, alerts } = useMemo(() => {
-    if (!data.length) return { sectorStats: {}, alerts: [] as SectorAnomaly[] };
+  // Histórico real dos alertas que dispararam notificação (registrado em
+  // src/lib/alertLog.ts pelo checkAnomaliesAndAlert do App.tsx), não um
+  // recálculo ao vivo — assim a tela mostra o que de fato foi detectado ao
+  // longo do dia, mesmo que a condição já tenha normalizado depois.
+  const alerts = useMemo(() => {
+    const logged = getAlertLogSince(hoursToAnalyze);
+    return [...logged]
+      .sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime())
+      .slice(0, 15);
+  }, [hoursToAnalyze, data]);
 
-    const sStats = buildSectorBandStats(data);
-
-    // Look at the last N elements
-    const readingsPerHour = 4; // 15 min intervals
-    const elementsToAnalyze = hoursToAnalyze * readingsPerHour;
-    const recentData = data.slice(-elementsToAnalyze);
-
-    const activeAlerts = recentData.flatMap(row => detectSectorAnomalies(row, sStats));
-
-    // Reverse sort by severity/deviation and limit to top 15 so it's not overwhelming
-    activeAlerts.sort((a, b) => b.deviation - a.deviation);
-    return { sectorStats: sStats, alerts: activeAlerts.slice(0, 15) };
-  }, [data, hoursToAnalyze]);
-
-  if (!data.length || !sectorStats) return null;
+  if (!data.length) return null;
 
   const formatKw = (val: number) => Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(val);
 
@@ -78,7 +73,7 @@ export function DiagnosticsView({ data }: Props) {
           </div>
           <div>
             <h2 className="text-xl font-semibold tracking-tight" style={{color: 'var(--accent-blue)'}}>MyFlux AI Diagnostics</h2>
-            <p className="text-sm text-gray-400 mt-1">Análise preditiva de anomalias com base em médias históricas e desvio padrão.</p>
+            <p className="text-sm text-gray-400 mt-1">Histórico dos alertas realmente detectados e notificados, com base em médias históricas e desvio padrão.</p>
           </div>
         </div>
         <div className="filter-group flex items-center bg-[#18181b] p-2 rounded-md border border-[#333]">
@@ -105,15 +100,15 @@ export function DiagnosticsView({ data }: Props) {
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangle className="w-5 h-5 text-amber-500" />
           <h3 className="font-semibold text-lg text-gray-200">
-            Alertas Ativos Detectados {hoursToAnalyze < 999999 ? `(Últimas ${hoursToAnalyze}h${lastDate ? ` - ${lastDate}` : ''})` : '(Todo o Período)'}
+            Histórico de Alertas Registrados {hoursToAnalyze < 999999 ? `(Últimas ${hoursToAnalyze}h${lastDate ? ` - ${lastDate}` : ''})` : '(Todo o Período)'}
           </h3>
         </div>
-        
+
         {alerts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-green-500 border border-green-500/20 bg-green-500/5 rounded-lg">
             <CheckCircle2 className="w-12 h-12 mb-3 opacity-80" />
-            <p className="text-lg font-medium">Nenhuma anomalia detectada</p>
-            <p className="text-sm opacity-70">Operação dentro da normalidade estatística no período selecionado.</p>
+            <p className="text-lg font-medium">Nenhum alerta registrado</p>
+            <p className="text-sm opacity-70">Nenhuma anomalia foi detectada e notificada no período selecionado.</p>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-[#333]">

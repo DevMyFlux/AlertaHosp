@@ -3,6 +3,7 @@ import { generateMockData } from './data/mockData';
 import { processCumulativeData } from './data/processor';
 import { ProcessedTelemetryData } from './types';
 import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, getActionText, getDiagnosticText } from './lib/anomalyDetection';
+import { logAlert } from './lib/alertLog';
 import { ExecutiveView } from './components/ExecutiveView';
 import { HVACView } from './components/HVACView';
 import { ImagingView } from './components/ImagingView';
@@ -55,6 +56,7 @@ export default function App() {
     for (const anomaly of anomalies) {
       if (alertedSectorsRef.current.has(anomaly.sectorKey)) continue;
       alertedSectorsRef.current.add(anomaly.sectorKey);
+      logAlert(anomaly);
 
       console.log(`Anomalia detectada em ${anomaly.sectorName}! Enviando alerta automático...`);
 
