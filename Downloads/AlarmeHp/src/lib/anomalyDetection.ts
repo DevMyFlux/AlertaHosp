@@ -115,6 +115,27 @@ export function formatValorParam(val: number, expectedMax: number): string {
   return `${kwhFormatter.format(val)} (limite ${kwhFormatter.format(expectedMax)}, +${deviationPct}%)`;
 }
 
+// Ação de campo recomendada com base no tipo do setor (mesma classificação
+// usada no Monitoramento de 15 Minutos e no Relatório de Diagnóstico da IA).
+export function getActionText(anomaly: Pick<SectorAnomaly, 'type' | 'subName' | 'subVal' | 'subMedian'>): string {
+  if (anomaly.type === 'Crítico') {
+    return "Contatar enfermaria/supervisão local para confirmar o uso extraordinário de equipamentos (suporte à vida). Não desarmar sem validação clínica.";
+  }
+  if (anomaly.type === 'Imagem') {
+    return "Acionar equipe de engenharia clínica. Verificar status do Chiller do equipamento e agendamento de exames em massa.";
+  }
+  if (anomaly.subName && anomaly.subVal > anomaly.subMedian * 1.3) {
+    return "Acionar equipe de facilities (Refrigeração). Verificar possível travamento de compressor ou falha no termostato.";
+  }
+  return "Contatar equipe de manutenção imediatamente.";
+}
+
+// Texto de diagnóstico simples (sem tendência histórica) para o alerta
+// automático disparado em background, sem interação do usuário.
+export function getDiagnosticText(anomaly: SectorAnomaly): string {
+  return `Identificado pico crítico de consumo. O setor está operando com ${kwhFormatter.format(anomaly.val)} kWh no intervalo de 15 minutos, ${kwhFormatter.format(anomaly.deviation)}% acima do limite esperado de ${kwhFormatter.format(anomaly.expectedMax)} kWh.`;
+}
+
 // Avalia os setores conhecidos (SECTOR_MAPPING) em uma única linha de
 // telemetria contra as estatísticas históricas do turno correspondente.
 // Usado tanto para varrer várias linhas (histórico) quanto uma só (snapshot

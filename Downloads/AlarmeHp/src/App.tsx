@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { generateMockData } from './data/mockData';
 import { processCumulativeData } from './data/processor';
 import { ProcessedTelemetryData } from './types';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, getActionText, getDiagnosticText } from './lib/anomalyDetection';
 import { ExecutiveView } from './components/ExecutiveView';
 import { HVACView } from './components/HVACView';
 import { ImagingView } from './components/ImagingView';
@@ -25,52 +26,60 @@ export default function App() {
 
   const SHEET_URL = "https://docs.google.com/spreadsheets/d/15BmawHMQ6ucZJwe5jqksRw2ZSW55R4IszgnmbTTYWGs/export?format=csv&gid=681869284";
 
+  // Setores que já dispararam alerta e ainda não voltaram ao normal — evita
+  // reenviar WhatsApp a cada ciclo de 15 min enquanto a mesma anomalia
+  // persiste (spam pro destinatário e risco de limite/qualidade na Meta).
+  const alertedSectorsRef = useRef<Set<string>>(new Set());
+
   const checkAnomaliesAndAlert = async (processedData: ProcessedTelemetryData[]) => {
     if (processedData.length === 0) return;
-    
-    // Pegar os últimos 30 registros para análise
-    const latestData = processedData.slice(-30);
-    const telemetryCsv = Papa.unparse(latestData);
 
-    try {
-      const response = await fetch('/api/check-anomalies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telemetryData: telemetryCsv })
-      });
-      
-      const result = await response.json();
-      
-      if (result.hasAnomaly) {
-        console.log("Anomalia detectada! Enviando alerta...");
-        
-        // Pega as configurações do localStorage
-        const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
-        const appId = localStorage.getItem('vonage_app_id') || '';
-        const privateKey = localStorage.getItem('vonage_private_key') || '';
-        const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
+    const last = processedData[processedData.length - 1];
+    const sStats = buildSectorBandStats(processedData);
+    const anomalies = detectSectorAnomalies(last, sStats);
 
+    const currentSectorKeys = new Set(anomalies.map(a => a.sectorKey));
+    // Setores que normalizaram podem alertar de novo na próxima vez que
+    // ficarem anômalos.
+    for (const key of Array.from(alertedSectorsRef.current)) {
+      if (!currentSectorKeys.has(key)) {
+        alertedSectorsRef.current.delete(key);
+      }
+    }
+
+    const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
+    const appId = localStorage.getItem('vonage_app_id') || '';
+    const privateKey = localStorage.getItem('vonage_private_key') || '';
+    const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
+
+    for (const anomaly of anomalies) {
+      if (alertedSectorsRef.current.has(anomaly.sectorKey)) continue;
+      alertedSectorsRef.current.add(anomaly.sectorKey);
+
+      console.log(`Anomalia detectada em ${anomaly.sectorName}! Enviando alerta automático...`);
+
+      const diagnostic = getDiagnosticText(anomaly);
+      const action = getActionText(anomaly);
+      const message = `Diagnóstico: ${diagnostic}\n\nAção: ${action}`;
+      const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
+      const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
+
+      try {
         const notifyResponse = await fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: result.message,
-            sector: result.sector,
-            valor: typeof result.valorKwh === 'number' ? result.valorKwh : undefined,
-            phone,
-            appId,
-            privateKey,
-            whatsappFrom
-          })
+          body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom })
         });
         const notifyData = await notifyResponse.json();
         const smsFallback = (notifyData.results || []).find((r: any) => r.channel === 'sms' && r.whatsappError);
         if (smsFallback) {
           console.warn("WhatsApp falhou, notificação caiu para SMS:", smsFallback.whatsappError);
         }
+      } catch (error) {
+        console.error(`Erro ao notificar automaticamente sobre ${anomaly.sectorName}:`, error);
+        // Falhou o envio: libera pra tentar de novo no próximo ciclo.
+        alertedSectorsRef.current.delete(anomaly.sectorKey);
       }
-    } catch (error) {
-      console.error("Erro na checagem automática de anomalias:", error);
     }
   };
 

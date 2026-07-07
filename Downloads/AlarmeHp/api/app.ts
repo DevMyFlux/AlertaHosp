@@ -233,44 +233,4 @@ Sempre que analisar os dados e encontrar padrões, responda EXATAMENTE neste for
   }
 });
 
-// API route for Auto Anomaly Detection
-app.post("/api/check-anomalies", async (req, res) => {
-  try {
-    const { telemetryData } = req.body;
-
-    const systemInstruction = `Você é um Engenheiro de Dados especialista em Eficiência Energética.
-Analise os dados de telemetria mais recentes fornecidos.
-Se houver alguma anomalia clara (ex: pico excessivo de consumo, consumo alto fora do padrão ou em horários atípicos), retorne um JSON EXATAMENTE neste formato:
-{ "hasAnomaly": true, "sector": "Nome do Setor", "message": "Descrição da anomalia identificada com valores em kWh. Recomende uma ação.", "valorKwh": 5.6 }
-
-O campo "valorKwh" deve ser o valor numérico (sem unidade, use ponto como separador decimal) de consumo em kWh que caracterizou a anomalia.
-
-Se os dados estiverem normais e dentro do padrão, retorne:
-{ "hasAnomaly": false }
-
-Regras:
-1. Responda APENAS com o JSON. Nenhuma outra palavra.
-2. Use sempre kWh (kilowatt-hora) nas descrições de energia.`;
-
-    const promptData = `[DADOS DE TELEMETRIA]:\n${telemetryData}`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: promptData,
-      config: {
-        systemInstruction,
-        responseMimeType: "application/json",
-      }
-    });
-
-    const resultText = response.text || "{}";
-    const resultJson = JSON.parse(resultText);
-
-    res.json(resultJson);
-  } catch (error: any) {
-    console.warn("Anomaly detection error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 export default app;

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, SectorAnomaly } from '../lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, getActionText, SectorAnomaly } from '../lib/anomalyDetection';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send, Clock, RefreshCw, Database } from 'lucide-react';
 
 interface Props {
@@ -134,16 +134,7 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
 
           <div className="grid grid-cols-1 gap-4">
             {alerts.map((alert, idx) => {
-              // Ação de campo com base no tipo do setor (mesma classificação
-              // usada no Relatório de Diagnóstico da IA).
-              let actionText = "Contatar equipe de manutenção imediatamente.";
-              if (alert.type === 'Crítico') {
-                actionText = "Contatar enfermaria/supervisão local para confirmar o uso extraordinário de equipamentos (suporte à vida). Não desarmar sem validação clínica.";
-              } else if (alert.type === 'Imagem') {
-                actionText = "Acionar equipe de engenharia clínica. Verificar status do Chiller do equipamento e agendamento de exames em massa.";
-              } else if (alert.subName && alert.subVal > (alert.subMedian * 1.3)) {
-                actionText = "Acionar equipe de facilities (Refrigeração). Verificar possível travamento de compressor ou falha no termostato.";
-              }
+              const actionText = getActionText(alert);
 
               // Get last 3 points
               const t0 = data.length >= 3 ? data[data.length - 3] : null;
