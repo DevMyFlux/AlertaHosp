@@ -45,7 +45,7 @@ async function extractVonageErrorDetail(error: any): Promise<string> {
 app.post("/api/notify", async (req, res) => {
   try {
     const { message, sector, phone, appId, privateKey, whatsappFrom } = req.body;
-    const to = phone || '5511943004579'; // Default se não for enviado
+    const to = phone || '5511949102183'; // Default se não for enviado
     const from = whatsappFrom || '556298792013'; // Sender for WhatsApp
 
     const apiKey = process.env.VONAGE_API_KEY;
@@ -88,7 +88,7 @@ app.post("/api/notify", async (req, res) => {
       const dynamicVonage = new Vonage(new Auth({ apiKey, apiSecret, applicationId, privateKey: pk }));
 
       // We will try to send to multiple numbers if 'phone' is a comma separated string
-      const phones = phone ? phone.split(',').map((p: string) => p.trim()) : [to, '551186510453', '5511949102183'];
+      const phones = phone ? phone.split(',').map((p: string) => p.trim()) : [to];
 
       const results = [];
       let hasSuccess = false;

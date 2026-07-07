@@ -14,7 +14,7 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
   const handleNotify = async (alertId: string, sector: string, diagnostic: string, action: string) => {
     setNotifying(prev => ({ ...prev, [alertId]: true }));
     try {
-      const phone = localStorage.getItem('notify_phone_number') || '5511943004579';
+      const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
       const appId = localStorage.getItem('vonage_app_id');
       const privateKey = localStorage.getItem('vonage_private_key');
       const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';

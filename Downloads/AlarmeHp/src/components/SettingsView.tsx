@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Save, Phone, Key, FileText } from 'lucide-react';
 
 export function SettingsView() {
-  const [phoneNumber, setPhoneNumber] = useState('5511943004579');
+  const [phoneNumber, setPhoneNumber] = useState('5511949102183');
   const [appId, setAppId] = useState('');
   const [privateKey, setPrivateKey] = useState('');
   const [whatsappFrom, setWhatsappFrom] = useState('556298792013');
@@ -54,7 +54,7 @@ export function SettingsView() {
                 type="text"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-                placeholder="Ex: 5511943004579"
+                placeholder="Ex: 5511949102183"
                 className="w-full bg-[#1A1A1A] border border-[#333] rounded-md px-4 py-2 text-white focus:outline-none focus:border-blue-500"
               />
               <p className="text-xs text-gray-500 mt-2">
@@ -91,7 +91,7 @@ export function SettingsView() {
                 type="text"
                 value={appId}
                 onChange={(e) => setAppId(e.target.value)}
-                placeholder="Ex: ccbee98e-5b47..."
+                placeholder="Ex: 5eaf2088-e756-4eac-988b-6c66d75e22cd"
                 className="w-full bg-[#1A1A1A] border border-[#333] rounded-md px-4 py-2 text-white font-mono text-sm focus:outline-none focus:border-blue-500"
               />
             </div>

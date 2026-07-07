@@ -45,7 +45,7 @@ export default function App() {
         console.log("Anomalia detectada! Enviando alerta...");
         
         // Pega as configurações do localStorage
-        const phone = localStorage.getItem('notify_phone_number') || '5511943004579';
+        const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
         const appId = localStorage.getItem('vonage_app_id') || '';
         const privateKey = localStorage.getItem('vonage_private_key') || '';
         const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
