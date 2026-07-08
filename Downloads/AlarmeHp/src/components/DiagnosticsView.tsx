@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { formatSectorParam, formatValorParam } from '../lib/anomalyDetection';
+import { formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam } from '../lib/anomalyDetection';
 import { getAlertLogSince } from '../lib/alertLog';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send } from 'lucide-react';
 
@@ -12,7 +12,7 @@ export function DiagnosticsView({ data }: Props) {
   const [hoursToAnalyze, setHoursToAnalyze] = useState(12);
   const [notifying, setNotifying] = useState<Record<string, boolean>>({});
 
-  const handleNotify = async (alertId: string, sector: string, diagnostic: string, action: string, kwh: number, expectedMax: number, severity: string) => {
+  const handleNotify = async (alertId: string, sector: string, diagnostic: string, action: string, kwh: number, expectedMax: number, severity: string, templateOverride?: string) => {
     setNotifying(prev => ({ ...prev, [alertId]: true }));
     try {
       const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
@@ -22,10 +22,13 @@ export function DiagnosticsView({ data }: Props) {
       const message = `Diagnóstico: ${diagnostic}\n\nAção: ${action}`;
       const sectorParam = formatSectorParam(sector, severity);
       const valor = formatValorParam(kwh, expectedMax);
+      const templateParams = templateOverride
+        ? [formatSetorNomeParam(sector), formatValorComUnidadeParam(kwh)]
+        : undefined;
       const response = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom })
+        body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to send notification");
@@ -260,7 +263,7 @@ export function DiagnosticsView({ data }: Props) {
 
                       <div className="pt-2">
                         <button 
-                          onClick={() => handleNotify(mainAlert.sectorKey + mainAlert.time, mainAlert.sectorName, diagnosticText, actionText, mainAlert.val, mainAlert.expectedMax, mainAlert.severity)}
+                          onClick={() => handleNotify(mainAlert.sectorKey + mainAlert.time, mainAlert.sectorName, diagnosticText, actionText, mainAlert.val, mainAlert.expectedMax, mainAlert.severity, mainAlert.templateOverride)}
                           disabled={notifying[mainAlert.sectorKey + mainAlert.time]}
                           className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-md border border-blue-500/30 transition-colors text-xs font-medium"
                         >

@@ -60,7 +60,7 @@ function resolveKwhParam(valor: unknown, message: string): string {
 // API route for WhatsApp / SMS Notifications
 app.post("/api/notify", async (req, res) => {
   try {
-    const { message, sector, valor, phone, appId, privateKey, whatsappFrom } = req.body;
+    const { message, sector, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams } = req.body;
     const to = phone || '5511949102183'; // Default se não for enviado
     const from = whatsappFrom || '556298792013'; // Sender for WhatsApp
 
@@ -109,7 +109,39 @@ app.post("/api/notify", async (req, res) => {
       const results = [];
       let hasSuccess = false;
 
+      // Setores com um template específico aprovado (ver SECTOR_MAPPING no
+      // frontend) usam esse template primeiro; se ele falhar (nome/parâmetros
+      // ainda não confirmados contra o texto real aprovado na Meta), caímos
+      // pro "sistema_de_alerta" — já comprovado — antes de desistir pro SMS.
+      const hasTemplateOverride = typeof templateOverride === 'string' && templateOverride.length > 0
+        && Array.isArray(templateParams) && templateParams.length > 0;
+
       for (const targetPhone of phones) {
+        let whatsappErrorDetail: string | undefined;
+
+        if (hasTemplateOverride) {
+          try {
+            await dynamicVonage.messages.send(new WhatsAppTemplate({
+              to: targetPhone,
+              from: from,
+              whatsapp: {
+                policy: 'deterministic',
+                locale: templateLocale,
+              },
+              template: {
+                name: `${templateNamespace}:${templateOverride}`,
+                parameters: templateParams.map((p: unknown) => toTemplateParam(String(p))),
+              },
+            }));
+            results.push({ phone: targetPhone, status: 'success', channel: 'whatsapp', template: templateOverride });
+            hasSuccess = true;
+            continue;
+          } catch (specificError: any) {
+            whatsappErrorDetail = `[${templateOverride}] ${await extractVonageErrorDetail(specificError)}`;
+            console.warn(`Template específico (${templateOverride}) falhou para ${targetPhone}, tentando sistema_de_alerta:`, whatsappErrorDetail);
+          }
+        }
+
         try {
           await dynamicVonage.messages.send(new WhatsAppTemplate({
             to: targetPhone,
@@ -123,32 +155,35 @@ app.post("/api/notify", async (req, res) => {
               parameters: [horaFormatada, toTemplateParam(sector), resolveKwhParam(valor, message)],
             },
           }));
-          results.push({ phone: targetPhone, status: 'success', channel: 'whatsapp' });
+          results.push({ phone: targetPhone, status: 'success', channel: 'whatsapp', template: templateNameOnly, whatsappError: whatsappErrorDetail });
           hasSuccess = true;
+          continue;
         } catch (wppError: any) {
-          const whatsappErrorDetail = await extractVonageErrorDetail(wppError);
+          const genericErrorDetail = `[${templateNameOnly}] ${await extractVonageErrorDetail(wppError)}`;
+          whatsappErrorDetail = whatsappErrorDetail ? `${whatsappErrorDetail} | ${genericErrorDetail}` : genericErrorDetail;
           console.warn(`WhatsApp failed for ${targetPhone}, falling back to SMS:`, whatsappErrorDetail);
+        }
 
-          try {
-            const smsResponse = await dynamicVonage.sms.send({
-              to: targetPhone,
-              from: from,
-              text: `ALERTA - ${sector}: ${message}`.substring(0, 160)
-            });
+        try {
+          const smsResponse = await dynamicVonage.sms.send({
+            to: targetPhone,
+            from: from,
+            text: `ALERTA - ${sector}: ${message}`.substring(0, 160)
+          });
 
-            if (smsResponse.messages && smsResponse.messages[0].status !== '0') {
-              throw new Error(smsResponse.messages[0]['error-text'] || smsResponse.messages[0].status);
-            }
-            results.push({ phone: targetPhone, status: 'success', channel: 'sms', whatsappError: whatsappErrorDetail });
-            hasSuccess = true;
-          } catch (smsError: any) {
-            results.push({
-              phone: targetPhone,
-              status: 'error',
-              error: smsError?.message || String(smsError),
-              whatsappError: whatsappErrorDetail
-            });
+          if (smsResponse.messages && smsResponse.messages[0].status !== '0') {
+            const firstMessage = smsResponse.messages[0] as any;
+            throw new Error(firstMessage.errorText || firstMessage['error-text'] || firstMessage.status);
           }
+          results.push({ phone: targetPhone, status: 'success', channel: 'sms', whatsappError: whatsappErrorDetail });
+          hasSuccess = true;
+        } catch (smsError: any) {
+          results.push({
+            phone: targetPhone,
+            status: 'error',
+            error: smsError?.message || String(smsError),
+            whatsappError: whatsappErrorDetail
+          });
         }
       }
 

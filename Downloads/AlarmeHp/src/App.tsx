@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { generateMockData } from './data/mockData';
 import { processCumulativeData } from './data/processor';
 import { ProcessedTelemetryData } from './types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, getActionText, getDiagnosticText } from './lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, getActionText, getDiagnosticText } from './lib/anomalyDetection';
 import { logAlert } from './lib/alertLog';
 import { ExecutiveView } from './components/ExecutiveView';
 import { HVACView } from './components/HVACView';
@@ -65,12 +65,18 @@ export default function App() {
       const message = `Diagnóstico: ${diagnostic}\n\nAção: ${action}`;
       const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
       const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
+      const templateParams = anomaly.templateOverride
+        ? [formatSetorNomeParam(anomaly.sectorName), formatValorComUnidadeParam(anomaly.val)]
+        : undefined;
 
       try {
         const notifyResponse = await fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom })
+          body: JSON.stringify({
+            sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom,
+            templateOverride: anomaly.templateOverride, templateParams
+          })
         });
         const notifyData = await notifyResponse.json();
         const smsFallback = (notifyData.results || []).find((r: any) => r.channel === 'sms' && r.whatsappError);

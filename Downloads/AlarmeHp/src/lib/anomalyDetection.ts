@@ -9,20 +9,38 @@ export function getBand(hour: number): TimeBand {
   return 'Demais Horários';
 }
 
-export const SECTOR_MAPPING: Record<string, { label: string; sub?: string; type: string }> = {
-  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra' },
-  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico' },
-  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico' },
-  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra' },
-  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico' },
+// `template`: nome (sem namespace) de um WhatsApp Message Template
+// específico aprovado pra esse setor, com 2 parâmetros (setor, valor com
+// unidade) — quando ausente, o alerta usa o template genérico
+// "sistema_de_alerta" (3 parâmetros: hora, setor, valor), que é o único
+// verificado end-to-end até agora. Os novos templates específicos ainda não
+// foram confirmados contra o texto real aprovado na Meta, por isso o
+// backend sempre tenta esse fallback antes de desistir (ver api/app.ts).
+export const SECTOR_MAPPING: Record<string, { label: string; sub?: string; type: string; template?: string }> = {
+  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra', template: 'setor_infra_alerta_energia' },
+  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico', template: 'setor_oncologia_alerta_energia' },
+  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico', template: 'setor_laboratorio_alerta_energia' },
+  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra', template: 'setor_refeitorio_alerta_consumo' },
+  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico', template: 'setor_cme_alerta_energia' },
   'SADT': { label: 'SADT', type: 'Crítico' },
   'ME_UTI_QG_E3': { label: 'UTI QG', sub: 'ME_CLIM_UTI', type: 'Crítico' },
   'ME_UTI_QD_IT': { label: 'UTI QD IT', sub: 'ME_CLIM_UTI', type: 'Crítico' },
-  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem' },
-  'DJ60_RM': { label: 'Ressonância', type: 'Imagem' },
-  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem' },
-  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem' },
-  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem' }
+  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem', template: 'setor_radiologia_alerta_energia' },
+  'DJ60_RM': { label: 'Ressonância', type: 'Imagem', template: 'setor_imaging_alerta_energia' },
+  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem', template: 'setor_imaging_alerta_energia' },
+  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem', template: 'setor_imaging_alerta_energia' },
+  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem', template: 'setor_imaging_alerta_energia' },
+  // Submetição de climatização promovida a setor próprio de alerta — os
+  // dados já vêm na planilha (usados até aqui só como referência cruzada
+  // via `sub`), mas nunca foram avaliados como anomalia independente.
+  'ME_CLIM_ONC_A_T': { label: 'HVAC Oncologia', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
+  'ME_CLIM_REF': { label: 'HVAC Refeitório', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
+  'ME_CLIM_LAVANDERIA': { label: 'HVAC Lavanderia', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
+  'ME_CLIM_UTI': { label: 'HVAC UTI', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
+  'ME_CLIM_CC_CO_CME': { label: 'HVAC CME', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
+  'ME_CLIM_EMERGENCIA': { label: 'HVAC Emergência', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
+  'ME_CLIM_AMBULATORIO': { label: 'HVAC Ambulatório', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
+  'ME_CLIM_LABORATORIO': { label: 'HVAC Laboratório', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
 };
 
 export interface SectorStats {
@@ -98,6 +116,9 @@ export interface SectorAnomaly {
   subVal: number;
   subMedian: number;
   subName: string;
+  // Nome (sem namespace) de um template específico pra esse setor, se
+  // configurado em SECTOR_MAPPING. Ausente = usa o "sistema_de_alerta".
+  templateOverride?: string;
 }
 
 const kwhFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
@@ -115,6 +136,18 @@ export function formatValorParam(val: number, expectedMax: number): string {
   return `${kwhFormatter.format(val)} (limite ${kwhFormatter.format(expectedMax)}, +${deviationPct}%)`;
 }
 
+// Parâmetros {{1}}/{{2}} dos novos templates específicos por setor (nome do
+// setor, valor com unidade) — formato mais simples que o do
+// "sistema_de_alerta", mantendo o padrão pt-BR (vírgula, 1 casa decimal) já
+// usado no resto da interface.
+export function formatSetorNomeParam(sectorName: string): string {
+  return sectorName.toUpperCase();
+}
+
+export function formatValorComUnidadeParam(val: number, unidade: string = 'kWh'): string {
+  return `${kwhFormatter.format(val)} ${unidade}`;
+}
+
 // Ação de campo recomendada com base no tipo do setor (mesma classificação
 // usada no Monitoramento de 15 Minutos e no Relatório de Diagnóstico da IA).
 export function getActionText(anomaly: Pick<SectorAnomaly, 'type' | 'subName' | 'subVal' | 'subMedian'>): string {
@@ -123,6 +156,9 @@ export function getActionText(anomaly: Pick<SectorAnomaly, 'type' | 'subName' | 
   }
   if (anomaly.type === 'Imagem') {
     return "Acionar equipe de engenharia clínica. Verificar status do Chiller do equipamento e agendamento de exames em massa.";
+  }
+  if (anomaly.type === 'HVAC') {
+    return "Acionar equipe de facilities (Refrigeração). Verificar limpeza de filtros, setpoint do termostato e possível travamento de compressor.";
   }
   if (anomaly.subName && anomaly.subVal > anomaly.subMedian * 1.3) {
     return "Acionar equipe de facilities (Refrigeração). Verificar possível travamento de compressor ou falha no termostato.";
@@ -190,6 +226,7 @@ export function detectSectorAnomalies(
           subVal,
           subMedian,
           subName: actualSubKey,
+          templateOverride: mapInfo.template,
         });
       }
     }
