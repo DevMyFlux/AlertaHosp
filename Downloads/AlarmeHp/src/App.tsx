@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { generateMockData } from './data/mockData';
 import { processCumulativeData } from './data/processor';
 import { ProcessedTelemetryData } from './types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, getActionText, getDiagnosticText } from './lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatAlertHeader, getActionText, getDiagnosticText } from './lib/anomalyDetection';
 import { logAlert } from './lib/alertLog';
 import { ExecutiveView } from './components/ExecutiveView';
 import { HVACView } from './components/HVACView';
@@ -62,7 +62,7 @@ export default function App() {
 
       const diagnostic = getDiagnosticText(anomaly);
       const action = getActionText(anomaly);
-      const message = `Diagnóstico: ${diagnostic}\n\nAção: ${action}`;
+      const message = `${formatAlertHeader(anomaly.sectorName)}\n\nDiagnóstico: ${diagnostic}\n\nAção: ${action}`;
       const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
       const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
       const templateParams = anomaly.templateOverride

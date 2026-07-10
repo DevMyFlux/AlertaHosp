@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, getActionText, SectorAnomaly } from '../lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatAlertHeader, getActionText, SectorAnomaly } from '../lib/anomalyDetection';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send, Clock, RefreshCw, Database } from 'lucide-react';
 
 interface Props {
@@ -19,7 +19,7 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
       const appId = localStorage.getItem('vonage_app_id');
       const privateKey = localStorage.getItem('vonage_private_key');
       const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
-      const message = `Diagnóstico: ${diagnostic}\n\nAção: ${action}`;
+      const message = `${formatAlertHeader(sector)}\n\nDiagnóstico: ${diagnostic}\n\nAção: ${action}`;
       const sectorParam = formatSectorParam(sector, severity);
       const valor = formatValorParam(kwh, expectedMax);
       const templateParams = templateOverride

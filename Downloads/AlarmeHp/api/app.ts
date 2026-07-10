@@ -165,10 +165,12 @@ app.post("/api/notify", async (req, res) => {
         }
 
         try {
+          // `message` já traz o cabeçalho "🚨 ALERTA DE ANOMALIA - SETOR"
+          // (ver formatAlertHeader no frontend) — não duplicar aqui.
           const smsResponse = await dynamicVonage.sms.send({
             to: targetPhone,
             from: from,
-            text: `ALERTA - ${sector}: ${message}`.substring(0, 160)
+            text: String(message ?? '').substring(0, 160)
           });
 
           if (smsResponse.messages && smsResponse.messages[0].status !== '0') {

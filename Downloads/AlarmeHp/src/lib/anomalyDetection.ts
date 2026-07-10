@@ -148,6 +148,14 @@ export function formatValorComUnidadeParam(val: number, unidade: string = 'kWh')
   return `${kwhFormatter.format(val)} ${unidade}`;
 }
 
+// Mesmo cabeçalho usado no card do Relatório de Diagnóstico da IA — usado no
+// texto que o próprio sistema controla (SMS de fallback, corpo interno da
+// mensagem). O texto FIXO já aprovado dentro de cada template WhatsApp na
+// Meta não pode ser alterado por aqui — só editando o template lá.
+export function formatAlertHeader(sectorName: string): string {
+  return `🚨 ALERTA DE ANOMALIA - ${sectorName.toUpperCase()}`;
+}
+
 // Ação de campo recomendada com base no tipo do setor (mesma classificação
 // usada no Monitoramento de 15 Minutos e no Relatório de Diagnóstico da IA).
 export function getActionText(anomaly: Pick<SectorAnomaly, 'type' | 'subName' | 'subVal' | 'subMedian'>): string {
