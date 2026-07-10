@@ -19,7 +19,7 @@ export function getBand(hour: number): TimeBand {
 export const SECTOR_MAPPING: Record<string, { label: string; sub?: string; type: string; template?: string }> = {
   'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra', template: 'setor_infra_alerta_energia' },
   'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico', template: 'setor_oncologia_alerta_energia' },
-  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico', template: 'setor_laboratorio_alerta_energia' },
+  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico', template: 'setor_laboratorio_alerta_energia2' },
   'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra', template: 'setor_refeitorio_alerta_consumo' },
   'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico', template: 'setor_cme_alerta_energia' },
   'SADT': { label: 'SADT', type: 'Crítico' },
