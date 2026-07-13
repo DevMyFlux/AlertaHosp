@@ -165,12 +165,16 @@ app.post("/api/notify", async (req, res) => {
         }
 
         try {
-          // `message` já traz o cabeçalho "🚨 ALERTA DE ANOMALIA - SETOR"
-          // (ver formatAlertHeader no frontend) — não duplicar aqui.
+          // `message` já vem formatada no padrão "⚠️ ALERTA - SETOR..."
+          // (ver formatStandardAlertMessage no frontend) — não duplicar aqui.
+          // Sem corte de 160 caracteres: a Vonage concatena automaticamente
+          // em múltiplos segmentos SMS quando o texto excede o limite de
+          // um único segmento, então o texto completo (com as causas
+          // prováveis) chega ao destinatário.
           const smsResponse = await dynamicVonage.sms.send({
             to: targetPhone,
             from: from,
-            text: String(message ?? '').substring(0, 160)
+            text: String(message ?? '')
           });
 
           if (smsResponse.messages && smsResponse.messages[0].status !== '0') {

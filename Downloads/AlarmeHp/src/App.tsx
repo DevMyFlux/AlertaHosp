@@ -2,22 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import { generateMockData } from './data/mockData';
 import { processCumulativeData } from './data/processor';
 import { ProcessedTelemetryData } from './types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatAlertHeader, getActionText, getDiagnosticText } from './lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatStandardAlertMessage } from './lib/anomalyDetection';
 import { logAlert } from './lib/alertLog';
 import { ExecutiveView } from './components/ExecutiveView';
 import { HVACView } from './components/HVACView';
 import { ImagingView } from './components/ImagingView';
 import { DiagnosticsView } from './components/DiagnosticsView';
 import { SectorView } from './components/SectorView';
-import { AiChatView } from './components/AiChatView';
+// AI Chat temporariamente removida do menu: GEMINI_API_KEY ainda não
+// confirmada na Vercel (não afeta o envio de alertas). Componente e rota
+// /api/chat continuam no código, só tiramos da navegação.
+// import { AiChatView } from './components/AiChatView';
 import { LiveMonitorView } from './components/LiveMonitorView';
 import { SettingsView } from './components/SettingsView';
 import Papa from 'papaparse';
-import { Activity, Wind, Radio, Database, UploadCloud, Bot, BarChart2, MessageSquare, Clock, Settings } from 'lucide-react';
+import { Activity, Wind, Radio, Database, UploadCloud, Bot, BarChart2, Clock, Settings } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'executive' | 'hvac' | 'imaging' | 'diagnostics' | 'sector' | 'chat' | 'live' | 'settings'>('executive');
+  const [activeTab, setActiveTab] = useState<'executive' | 'hvac' | 'imaging' | 'diagnostics' | 'sector' | 'live' | 'settings'>('executive');
   const [data, setData] = useState<ProcessedTelemetryData[]>([]);
   const [isSimulated, setIsSimulated] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -60,9 +63,7 @@ export default function App() {
 
       console.log(`Anomalia detectada em ${anomaly.sectorName}! Enviando alerta automático...`);
 
-      const diagnostic = getDiagnosticText(anomaly);
-      const action = getActionText(anomaly);
-      const message = `${formatAlertHeader(anomaly.sectorName)}\n\nDiagnóstico: ${diagnostic}\n\nAção: ${action}`;
+      const message = formatStandardAlertMessage(anomaly);
       const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
       const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
       const templateParams = anomaly.templateOverride
@@ -211,7 +212,6 @@ export default function App() {
             <TabButton active={activeTab === 'hvac'} onClick={() => setActiveTab('hvac')} icon={<Wind className="w-4 h-4" />}>Operação e HVAC</TabButton>
             <TabButton active={activeTab === 'imaging'} onClick={() => setActiveTab('imaging')} icon={<Radio className="w-4 h-4" />}>Diag. Imagem</TabButton>
             <TabButton active={activeTab === 'diagnostics'} onClick={() => setActiveTab('diagnostics')} icon={<Bot className="w-4 h-4" />}>AI Diagnostics</TabButton>
-            <TabButton active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<MessageSquare className="w-4 h-4" />}>AI Chat</TabButton>
             <TabButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings className="w-4 h-4" />}>Configurações</TabButton>
           </div>
         </div>
@@ -223,15 +223,6 @@ export default function App() {
             Carregar CSV
             <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
           </label>
-          {isSimulated && (
-            <button 
-              onClick={() => { const mock = generateMockData(); setData(processCumulativeData(mock)); }}
-              className="btn-tab text-center justify-center mt-2"
-              style={{ color: 'var(--accent-amber)', borderColor: 'var(--line)' }}
-            >
-              Regerar Simulação
-            </button>
-          )}
         </div>
 
         <div className="math-hint">
@@ -251,7 +242,6 @@ export default function App() {
           {activeTab === 'hvac' && <HVACView data={data} />}
           {activeTab === 'imaging' && <ImagingView data={data} />}
           {activeTab === 'diagnostics' && <DiagnosticsView data={data} />}
-          {activeTab === 'chat' && <AiChatView data={data} />}
           {activeTab === 'settings' && <SettingsView />}
       </main>
     </div>

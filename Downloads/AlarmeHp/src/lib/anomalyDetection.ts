@@ -13,34 +13,39 @@ export function getBand(hour: number): TimeBand {
 // específico aprovado pra esse setor, com 2 parâmetros (setor, valor com
 // unidade) — quando ausente, o alerta usa o template genérico
 // "sistema_de_alerta" (3 parâmetros: hora, setor, valor), que é o único
-// verificado end-to-end até agora. Os novos templates específicos ainda não
-// foram confirmados contra o texto real aprovado na Meta, por isso o
-// backend sempre tenta esse fallback antes de desistir (ver api/app.ts).
+// verificado end-to-end. Os demais templates específicos (setor_cme_*,
+// setor_radiologia_*, setor_oncologia_*, setor_refeitorio_*,
+// setor_imaging_*, setor_infra_*, setor_hvac_*) foram removidos daqui por
+// nunca terem sido confirmados entregando — só setor_laboratorio_alerta_energia2
+// segue mapeado, e mesmo esse cai pro "sistema_de_alerta" se falhar (ver
+// api/app.ts). Os templates em si continuam existindo no Meta Business
+// Manager / Vonage; removê-los de lá (se quiser) é uma ação manual fora
+// deste código.
 export const SECTOR_MAPPING: Record<string, { label: string; sub?: string; type: string; template?: string }> = {
-  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra', template: 'setor_infra_alerta_energia' },
-  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico', template: 'setor_oncologia_alerta_energia' },
+  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra' },
+  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico' },
   'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico', template: 'setor_laboratorio_alerta_energia2' },
-  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra', template: 'setor_refeitorio_alerta_consumo' },
-  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico', template: 'setor_cme_alerta_energia' },
+  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra' },
+  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico' },
   'SADT': { label: 'SADT', type: 'Crítico' },
   'ME_UTI_QG_E3': { label: 'UTI QG', sub: 'ME_CLIM_UTI', type: 'Crítico' },
   'ME_UTI_QD_IT': { label: 'UTI QD IT', sub: 'ME_CLIM_UTI', type: 'Crítico' },
-  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem', template: 'setor_radiologia_alerta_energia' },
-  'DJ60_RM': { label: 'Ressonância', type: 'Imagem', template: 'setor_imaging_alerta_energia' },
-  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem', template: 'setor_imaging_alerta_energia' },
-  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem', template: 'setor_imaging_alerta_energia' },
-  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem', template: 'setor_imaging_alerta_energia' },
+  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem' },
+  'DJ60_RM': { label: 'Ressonância', type: 'Imagem' },
+  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem' },
+  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem' },
+  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem' },
   // Submetição de climatização promovida a setor próprio de alerta — os
   // dados já vêm na planilha (usados até aqui só como referência cruzada
   // via `sub`), mas nunca foram avaliados como anomalia independente.
-  'ME_CLIM_ONC_A_T': { label: 'HVAC Oncologia', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
-  'ME_CLIM_REF': { label: 'HVAC Refeitório', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
-  'ME_CLIM_LAVANDERIA': { label: 'HVAC Lavanderia', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
-  'ME_CLIM_UTI': { label: 'HVAC UTI', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
-  'ME_CLIM_CC_CO_CME': { label: 'HVAC CME', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
-  'ME_CLIM_EMERGENCIA': { label: 'HVAC Emergência', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
-  'ME_CLIM_AMBULATORIO': { label: 'HVAC Ambulatório', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
-  'ME_CLIM_LABORATORIO': { label: 'HVAC Laboratório', type: 'HVAC', template: 'setor_hvac_alerta_energia' },
+  'ME_CLIM_ONC_A_T': { label: 'HVAC Oncologia', type: 'HVAC' },
+  'ME_CLIM_REF': { label: 'HVAC Refeitório', type: 'HVAC' },
+  'ME_CLIM_LAVANDERIA': { label: 'HVAC Lavanderia', type: 'HVAC' },
+  'ME_CLIM_UTI': { label: 'HVAC UTI', type: 'HVAC' },
+  'ME_CLIM_CC_CO_CME': { label: 'HVAC CME', type: 'HVAC' },
+  'ME_CLIM_EMERGENCIA': { label: 'HVAC Emergência', type: 'HVAC' },
+  'ME_CLIM_AMBULATORIO': { label: 'HVAC Ambulatório', type: 'HVAC' },
+  'ME_CLIM_LABORATORIO': { label: 'HVAC Laboratório', type: 'HVAC' },
 };
 
 export interface SectorStats {
@@ -172,6 +177,72 @@ export function getActionText(anomaly: Pick<SectorAnomaly, 'type' | 'subName' | 
     return "Acionar equipe de facilities (Refrigeração). Verificar possível travamento de compressor ou falha no termostato.";
   }
   return "Contatar equipe de manutenção imediatamente.";
+}
+
+// Causas prováveis exibidas na mensagem enviada ao destinatário, no mesmo
+// estilo do template aprovado setor_laboratorio_alerta_energia2 (lista fixa
+// de "Possíveis causas"). O Laboratório usa o texto já aprovado ali; os
+// demais setores caem no conjunto padrão do seu `type`.
+const SECTOR_SPECIFIC_CAUSES: Record<string, string[]> = {
+  'DJ13_Laboratorio': [
+    'Equipamentos de análise ligados',
+    'Refrigerador/Freezer com mal funcionamento',
+    'Centrífuga em operação contínua',
+  ],
+};
+
+const TYPE_CAUSES: Record<string, string[]> = {
+  'Crítico': [
+    'Equipamento de suporte à vida em uso intensivo',
+    'Pico de demanda simultânea de múltiplos equipamentos',
+    'Possível falha elétrica local (curto-circuito)',
+  ],
+  'Imagem': [
+    'Exame de alta demanda energética em andamento',
+    'Chiller do equipamento em sobrecarga',
+    'Acúmulo de exames agendados no mesmo intervalo',
+  ],
+  'HVAC': [
+    'Compressor travado ou ciclando incorretamente',
+    'Filtros de ar sujos forçando o equipamento',
+    'Termostato com setpoint incorreto',
+  ],
+  'Infra': [
+    'Equipamentos/máquinas ligados fora do horário',
+    'Iluminação ou ar-condicionado esquecido ligado',
+    'Uso simultâneo de múltiplos equipamentos de grande porte',
+  ],
+};
+
+export function getPossibleCauses(anomaly: Pick<SectorAnomaly, 'sectorKey' | 'type'>): string[] {
+  return SECTOR_SPECIFIC_CAUSES[anomaly.sectorKey] || TYPE_CAUSES[anomaly.type] || TYPE_CAUSES['Infra'];
+}
+
+// Corpo da mensagem efetivamente recebida pelo destinatário via SMS de
+// fallback (quando o template WhatsApp falha) e também usado como registro
+// interno do alerta — segue o mesmo padrão visual do template aprovado
+// setor_laboratorio_alerta_energia2: cabeçalho, setor, consumo, causas
+// prováveis, ação e assinatura. O corpo do template WhatsApp em si (texto
+// fixo aprovado na Meta) não é alterado por aqui.
+export function formatStandardAlertMessage(
+  anomaly: Pick<SectorAnomaly, 'sectorKey' | 'sectorName' | 'type' | 'val' | 'subName' | 'subVal' | 'subMedian'>
+): string {
+  const setor = anomaly.sectorName.toUpperCase();
+  const causas = getPossibleCauses(anomaly);
+  const acao = getActionText(anomaly);
+  return [
+    `⚠️ ALERTA - ${setor}`,
+    `Consumo anômalo de energia detectado!`,
+    ``,
+    `Setor: ${setor}`,
+    `Consumo: ${kwhFormatter.format(anomaly.val)} kWh (últimos 15 min)`,
+    ``,
+    `Possíveis causas:`,
+    ...causas.map(c => `- ${c}`),
+    ``,
+    `Ação: ${acao}`,
+    `Equipe Carbono Zero`,
+  ].join('\n');
 }
 
 // Texto de diagnóstico simples (sem tendência histórica) para o alerta

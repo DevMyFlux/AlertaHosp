@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatAlertHeader } from '../lib/anomalyDetection';
+import { formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatStandardAlertMessage, SectorAnomaly } from '../lib/anomalyDetection';
 import { getAlertLogSince } from '../lib/alertLog';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send } from 'lucide-react';
 
@@ -12,23 +12,23 @@ export function DiagnosticsView({ data }: Props) {
   const [hoursToAnalyze, setHoursToAnalyze] = useState(12);
   const [notifying, setNotifying] = useState<Record<string, boolean>>({});
 
-  const handleNotify = async (alertId: string, sector: string, diagnostic: string, action: string, kwh: number, expectedMax: number, severity: string, templateOverride?: string) => {
+  const handleNotify = async (alertId: string, anomaly: SectorAnomaly) => {
     setNotifying(prev => ({ ...prev, [alertId]: true }));
     try {
       const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
       const appId = localStorage.getItem('vonage_app_id');
       const privateKey = localStorage.getItem('vonage_private_key');
       const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
-      const message = `${formatAlertHeader(sector)}\n\nDiagnóstico: ${diagnostic}\n\nAção: ${action}`;
-      const sectorParam = formatSectorParam(sector, severity);
-      const valor = formatValorParam(kwh, expectedMax);
-      const templateParams = templateOverride
-        ? [formatSetorNomeParam(sector), formatValorComUnidadeParam(kwh)]
+      const message = formatStandardAlertMessage(anomaly);
+      const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
+      const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
+      const templateParams = anomaly.templateOverride
+        ? [formatSetorNomeParam(anomaly.sectorName), formatValorComUnidadeParam(anomaly.val)]
         : undefined;
       const response = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams })
+        body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom, templateOverride: anomaly.templateOverride, templateParams })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to send notification");
@@ -157,8 +157,8 @@ export function DiagnosticsView({ data }: Props) {
         )}
       </div>
 
-      {/* Diagnóstico detalhado estilo Relatório IA e Sugestões de Prompts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Diagnóstico detalhado estilo Relatório IA */}
+      <div className="grid grid-cols-1 gap-4">
         {alerts.length > 0 ? (
           <div className="chart-container flex flex-col bg-[#0a0a0c] border border-blue-900/30">
             <div className="flex items-center gap-2 mb-4 border-b border-[#222] pb-3">
@@ -262,8 +262,8 @@ export function DiagnosticsView({ data }: Props) {
                       </div>
 
                       <div className="pt-2">
-                        <button 
-                          onClick={() => handleNotify(mainAlert.sectorKey + mainAlert.time, mainAlert.sectorName, diagnosticText, actionText, mainAlert.val, mainAlert.expectedMax, mainAlert.severity, mainAlert.templateOverride)}
+                        <button
+                          onClick={() => handleNotify(mainAlert.sectorKey + mainAlert.time, mainAlert)}
                           disabled={notifying[mainAlert.sectorKey + mainAlert.time]}
                           className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-md border border-blue-500/30 transition-colors text-xs font-medium"
                         >
@@ -313,49 +313,6 @@ export function DiagnosticsView({ data }: Props) {
             <p className="text-gray-400 text-sm">Aguardando eventos para gerar relatório de diagnóstico...</p>
           </div>
         )}
-
-        {/* Sugestões de Prompts */}
-        <div className="chart-container flex flex-col bg-[#111] border border-[#333]">
-          <div className="flex items-center gap-2 mb-4 border-b border-[#222] pb-3">
-            <Activity className="w-5 h-5 text-purple-400" />
-            <h3 className="font-semibold text-lg text-gray-200">Interaja com a IA (Sugestões de Prompts)</h3>
-          </div>
-          
-          <div className="space-y-4 flex-1 max-h-[600px] overflow-y-auto custom-scrollbar text-sm text-gray-300 pr-2">
-            <p className="text-xs text-gray-500 mb-2">Com base nos dados disponíveis nas tabelas de telemetria, você pode solicitar as seguintes análises avançadas:</p>
-            
-            <div className="p-3 border border-purple-900/30 rounded-lg bg-purple-900/10">
-              <h4 className="font-semibold text-purple-300 mb-2 text-xs uppercase tracking-wider">1. Análise de Tendências e Gráficos</h4>
-              <ul className="space-y-2 list-disc list-inside text-gray-400 text-xs">
-                <li><span className="text-gray-300 italic">"Crie um gráfico de linha mostrando a evolução do consumo de energia dos setores DJ1_Lavanderia e DJ7_Oncologia ao longo do tempo usando os dados da Sheet1."</span></li>
-                <li><span className="text-gray-300 italic">"Gere um gráfico de barras comparando o Consumo Total de todos os medidores listados na tabela 'Resumo_2026_06_15'."</span></li>
-              </ul>
-            </div>
-
-            <div className="p-3 border border-purple-900/30 rounded-lg bg-purple-900/10">
-              <h4 className="font-semibold text-purple-300 mb-2 text-xs uppercase tracking-wider">2. Identificação de Picos e Médias</h4>
-              <ul className="space-y-2 list-disc list-inside text-gray-400 text-xs">
-                <li><span className="text-gray-300 italic">"Qual foi o horário de maior consumo total registrado na Sheet1 e quais setores mais contribuíram para esse pico?"</span></li>
-                <li><span className="text-gray-300 italic">"Calcule a média de consumo por hora do dia para o setor DJ40_Refeitorio para entender o perfil de uso."</span></li>
-              </ul>
-            </div>
-
-            <div className="p-3 border border-purple-900/30 rounded-lg bg-purple-900/10">
-              <h4 className="font-semibold text-purple-300 mb-2 text-xs uppercase tracking-wider">3. Comparação com Metas (Setpoints)</h4>
-              <ul className="space-y-2 list-disc list-inside text-gray-400 text-xs">
-                <li><span className="text-gray-300 italic">"Compare os valores de consumo da Sheet1 com os limites definidos na tabela Calc_Setpoints. Algum setor ultrapassou a meta de 2,5 em algum período?"</span></li>
-                <li><span className="text-gray-300 italic">"Crie um resumo mostrando quais setores estão operando acima ou abaixo da média esperada conforme as definições de períodos (Madrugada, Café, Almoço, Noite)."</span></li>
-              </ul>
-            </div>
-
-            <div className="p-3 border border-purple-900/30 rounded-lg bg-purple-900/10">
-              <h4 className="font-semibold text-purple-300 mb-2 text-xs uppercase tracking-wider">4. Resumo Executivo</h4>
-              <ul className="space-y-2 list-disc list-inside text-gray-400 text-xs">
-                <li><span className="text-gray-300 italic">"Faça um diagnóstico geral dos dados: quais são os 3 setores que mais consomem energia e qual a variação percentual entre o consumo máximo e mínimo de cada um?"</span></li>
-              </ul>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

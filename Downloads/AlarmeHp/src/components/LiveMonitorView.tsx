@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatAlertHeader, getActionText, SectorAnomaly } from '../lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatStandardAlertMessage, getActionText, SectorAnomaly } from '../lib/anomalyDetection';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send, Clock, RefreshCw, Database } from 'lucide-react';
 
 interface Props {
@@ -12,23 +12,23 @@ interface Props {
 export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
   const [notifying, setNotifying] = useState<Record<string, boolean>>({});
 
-  const handleNotify = async (alertId: string, sector: string, diagnostic: string, action: string, kwh: number, expectedMax: number, severity: string, templateOverride?: string) => {
+  const handleNotify = async (alertId: string, anomaly: SectorAnomaly) => {
     setNotifying(prev => ({ ...prev, [alertId]: true }));
     try {
       const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
       const appId = localStorage.getItem('vonage_app_id');
       const privateKey = localStorage.getItem('vonage_private_key');
       const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
-      const message = `${formatAlertHeader(sector)}\n\nDiagnóstico: ${diagnostic}\n\nAção: ${action}`;
-      const sectorParam = formatSectorParam(sector, severity);
-      const valor = formatValorParam(kwh, expectedMax);
-      const templateParams = templateOverride
-        ? [formatSetorNomeParam(sector), formatValorComUnidadeParam(kwh)]
+      const message = formatStandardAlertMessage(anomaly);
+      const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
+      const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
+      const templateParams = anomaly.templateOverride
+        ? [formatSetorNomeParam(anomaly.sectorName), formatValorComUnidadeParam(anomaly.val)]
         : undefined;
       const response = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams })
+        body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom, templateOverride: anomaly.templateOverride, templateParams })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to send notification");
@@ -195,7 +195,7 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
 
                         <div className="pt-2">
                           <button
-                            onClick={() => handleNotify(alert.sectorKey + alert.time, alert.sectorName, diagnosticText, actionText, alert.val, alert.expectedMax, alert.severity, alert.templateOverride)}
+                            onClick={() => handleNotify(alert.sectorKey + alert.time, alert)}
                             disabled={notifying[alert.sectorKey + alert.time]}
                             className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-md border border-blue-500/30 transition-colors text-xs font-medium"
                           >
