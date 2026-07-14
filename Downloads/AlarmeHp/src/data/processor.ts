@@ -25,19 +25,36 @@ function parseNumber(val: any): number {
   return 0;
 }
 
+// Guarda estatística contra leituras fisicamente implausíveis (glitch de
+// medidor/telemetria, não consumo real) — ex: um salto de 1.000.003,2 kWh
+// em 15 minutos, que nenhum disjuntor hospitalar sustenta. A guarda de
+// "consumption < 0" abaixo só pega reset de medidor pra trás; isso aqui
+// cobre o caso simétrico (pra cima). Usamos a mediana das leituras válidas
+// recentes de cada setor como referência local (mais robusta que a média,
+// que um único pico já distorce) e barramos qualquer leitura muito acima
+// dela. Isso também evita que o pico contamine buildSectorBandStats
+// (média/desvio-padrão usados no cálculo do limite de anomalia), já que
+// esses stats são recalculados sobre o valor JÁ tratado aqui.
+const SPIKE_FACTOR = 15; // múltiplo da mediana recente a partir do qual uma leitura é tratada como corrompida
+const SPIKE_MIN_SAMPLES = 5; // amostras válidas mínimas antes de aplicar a guarda (evita falso positivo no início do histórico)
+const SPIKE_WINDOW = 40; // ~10h de histórico recente (intervalos de 15min) usado como referência local por setor
+const SPIKE_ABS_FLOOR_KWH = 5; // nunca barra abaixo disso, pra não marcar ruído perto de zero como spike
+
 export function processCumulativeData(rawData: RawTelemetryData[]): ProcessedTelemetryData[] {
   if (!rawData || rawData.length === 0) return [];
 
   const validData = rawData.filter(d => d && d.E3TimeStamp);
-  
+
   // Sort by time just in case
   const sorted = [...validData].sort((a, b) => {
     const timeA = new Date(a.E3TimeStamp.replace(' ', 'T')).getTime();
     const timeB = new Date(b.E3TimeStamp.replace(' ', 'T')).getTime();
     return timeA - timeB;
   });
-  
+
   const processed: ProcessedTelemetryData[] = [];
+  const recentBySector: Record<string, number[]> = {};
+  ALL_SECTORS.forEach(sec => { recentBySector[sec] = []; });
 
   for (let i = 1; i < sorted.length; i++) {
     const current = sorted[i];
@@ -88,8 +105,27 @@ export function processCumulativeData(rawData: RawTelemetryData[]): ProcessedTel
         if (consumption < 0) {
           consumption = 0; // Better safe than huge spikes
         }
+
+        const recent = recentBySector[sector];
+        if (consumption > 0 && recent.length >= SPIKE_MIN_SAMPLES) {
+          const sortedRecent = [...recent].sort((a, b) => a - b);
+          const median = sortedRecent[Math.floor(sortedRecent.length / 2)];
+          const ceiling = Math.max(median * SPIKE_FACTOR, SPIKE_ABS_FLOOR_KWH);
+          if (consumption > ceiling) {
+            console.warn(`[spike-guard] ${sector}: leitura de ${consumption.toFixed(1)} kWh em ${record.timestamp} descartada (>${SPIKE_FACTOR}x a mediana recente de ${median.toFixed(1)} kWh) — tratada como falha de telemetria, não anomalia real.`);
+            record[`${sector}_Spike`] = 1;
+            consumption = 0;
+            corruptedTags++;
+          }
+        }
+
         record[sector] = consumption;
         totalConsumption += consumption;
+
+        if (consumption > 0) {
+          recent.push(consumption);
+          if (recent.length > SPIKE_WINDOW) recent.shift();
+        }
       }
     });
 

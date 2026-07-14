@@ -129,28 +129,33 @@ export interface SectorAnomaly {
 const kwhFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
 
 // Monta os parâmetros {{2}} (setor) e {{3}} (valor) do template WhatsApp
-// "sistema_de_alerta" com o máximo de contexto possível sem alterar o texto
-// fixo aprovado — o setor ganha a severidade entre parênteses, e o valor
-// ganha o limite esperado e o desvio percentual.
-export function formatSectorParam(sectorName: string, severity: string): string {
-  return `${sectorName} (${severity})`;
+// "sistema_de_alerta". O texto fixo aprovado na Meta é uma frase pronta
+// ("...o setor [LOCAL] consumiu [VALOR] kWh de energia elétrica...") — os
+// parâmetros precisam encaixar como texto simples nessa frase. Antes essa
+// função enfiava "(limite X, +Y%)" dentro do {{3}} e "(Crítico)" dentro do
+// {{2}}, o que quebrava a gramática da frase (ex: "consumiu 1.000.003,2
+// (limite 63.071,3, +1486%)kWh"). Severidade e desvio já ficam visíveis no
+// dashboard (Monitoramento/AI Diagnostics) — aqui mandamos só o valor limpo.
+export function formatSectorParam(sectorName: string, _severity: string): string {
+  return sectorName;
 }
 
-export function formatValorParam(val: number, expectedMax: number): string {
-  const deviationPct = expectedMax > 0 ? Math.round(((val - expectedMax) / expectedMax) * 100) : 0;
-  return `${kwhFormatter.format(val)} (limite ${kwhFormatter.format(expectedMax)}, +${deviationPct}%)`;
+export function formatValorParam(val: number, _expectedMax: number): string {
+  return kwhFormatter.format(val);
 }
 
-// Parâmetros {{1}}/{{2}} dos novos templates específicos por setor (nome do
-// setor, valor com unidade) — formato mais simples que o do
-// "sistema_de_alerta", mantendo o padrão pt-BR (vírgula, 1 casa decimal) já
-// usado no resto da interface.
+// Parâmetros {{1}}/{{2}} do template setor_laboratorio_alerta_energia2 (nome
+// do setor, valor). Confirmado nas "Amostras de variáveis" do template
+// aprovado: {{1}} = "LABORATÓRIO" (setor em maiúsculo, sem unidade) e
+// {{2}} = "125.45" (só o número, SEM "kWh" — a unidade já está fixa no
+// corpo do template, logo depois da variável). Antes essa função grudava
+// " kWh" no {{2}}, duplicando a unidade na mensagem final ("125,4 kWh kWh").
 export function formatSetorNomeParam(sectorName: string): string {
   return sectorName.toUpperCase();
 }
 
-export function formatValorComUnidadeParam(val: number, unidade: string = 'kWh'): string {
-  return `${kwhFormatter.format(val)} ${unidade}`;
+export function formatValorComUnidadeParam(val: number, _unidade: string = 'kWh'): string {
+  return kwhFormatter.format(val);
 }
 
 // Mesmo cabeçalho usado no card do Relatório de Diagnóstico da IA — usado no

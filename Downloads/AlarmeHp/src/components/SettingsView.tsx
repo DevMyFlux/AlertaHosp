@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Phone, Key, FileText, Plus, X } from 'lucide-react';
+import { Settings, Save, Phone, Key, FileText, Plus, X, FlaskConical } from 'lucide-react';
 
 export function SettingsView() {
   const [phoneNumbers, setPhoneNumbers] = useState<string[]>(['5511949102183']);
@@ -7,6 +7,8 @@ export function SettingsView() {
   const [appId, setAppId] = useState('');
   const [privateKey, setPrivateKey] = useState('');
   const [whatsappFrom, setWhatsappFrom] = useState('556298792013');
+  const [testingLab, setTestingLab] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('notify_phone_number');
@@ -45,6 +47,41 @@ export function SettingsView() {
     localStorage.setItem('vonage_private_key', privateKey);
     localStorage.setItem('vonage_whatsapp_from', whatsappFrom);
     alert('Configurações salvas com sucesso!');
+  };
+
+  // Diagnóstico temporário: dispara um envio real de teste direto pro
+  // template setor_laboratorio_alerta_energia2 (valores fictícios,
+  // claramente marcados como TESTE) e mostra o erro exato devolvido pela
+  // Vonage/Meta na tela, sem precisar esperar uma anomalia real nem vasculhar
+  // os Logs da Vercel. Remover este bloco depois que o template estiver
+  // confirmado entregando.
+  const handleTestLabTemplate = async () => {
+    setTestingLab(true);
+    setTestResult(null);
+    try {
+      const phone = phoneNumbers.join(',') || localStorage.getItem('notify_phone_number') || '5511949102183';
+      const response = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sector: 'LABORATÓRIO (TESTE)',
+          message: 'Mensagem de teste de diagnóstico do template do Laboratório — pode ignorar.',
+          valor: '0,1',
+          phone,
+          appId,
+          privateKey,
+          whatsappFrom,
+          templateOverride: 'setor_laboratorio_alerta_energia2',
+          templateParams: ['LABORATÓRIO - TESTE', '0,1'],
+        }),
+      });
+      const data = await response.json();
+      setTestResult(JSON.stringify(data, null, 2));
+    } catch (e: any) {
+      setTestResult(`Erro de rede ao chamar /api/notify: ${e?.message || e}`);
+    } finally {
+      setTestingLab(false);
+    }
   };
 
   return (
@@ -171,6 +208,34 @@ export function SettingsView() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Diagnóstico temporário — remover quando o template do Laboratório
+          estiver confirmado entregando. */}
+      <div className="chart-container border-amber-500/30 bg-amber-950/10">
+        <h3 className="text-lg font-medium text-gray-200 mb-2 flex items-center gap-2">
+          <FlaskConical className="w-5 h-5 text-amber-400" />
+          Diagnóstico (temporário): template do Laboratório
+        </h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Dispara um envio de teste real (valores fictícios, marcados como TESTE) direto pro template
+          <code className="mx-1 text-amber-300">setor_laboratorio_alerta_energia2</code>
+          pros números cadastrados acima, e mostra a resposta completa da API — incluindo o erro exato
+          da Vonage/Meta se falhar. Esse bloco é só pra investigação e será removido depois.
+        </p>
+        <button
+          onClick={handleTestLabTemplate}
+          disabled={testingLab}
+          className="flex items-center gap-2 px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 rounded-md border border-amber-500/30 font-medium transition-colors text-sm disabled:opacity-50"
+        >
+          <FlaskConical className="w-4 h-4" />
+          {testingLab ? 'Enviando teste...' : 'Testar template Laboratório'}
+        </button>
+        {testResult && (
+          <pre className="mt-4 p-3 bg-[#0a0a0c] border border-[#333] rounded-md text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap">
+            {testResult}
+          </pre>
+        )}
       </div>
     </div>
   );
