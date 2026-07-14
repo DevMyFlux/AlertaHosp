@@ -7,7 +7,7 @@ export function SettingsView() {
   const [appId, setAppId] = useState('');
   const [privateKey, setPrivateKey] = useState('');
   const [whatsappFrom, setWhatsappFrom] = useState('556298792013');
-  const [testingLab, setTestingLab] = useState(false);
+  const [testingType, setTestingType] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,14 +49,22 @@ export function SettingsView() {
     alert('Configurações salvas com sucesso!');
   };
 
-  // Diagnóstico temporário: dispara um envio real de teste direto pro
-  // template setor_laboratorio_alerta_energia2 (valores fictícios,
-  // claramente marcados como TESTE) e mostra o erro exato devolvido pela
-  // Vonage/Meta na tela, sem precisar esperar uma anomalia real nem vasculhar
-  // os Logs da Vercel. Remover este bloco depois que o template estiver
-  // confirmado entregando.
-  const handleTestLabTemplate = async () => {
-    setTestingLab(true);
+  // Diagnóstico temporário: dispara um envio real de teste direto pra cada
+  // um dos 4 templates por tipo (valores fictícios, claramente marcados
+  // como TESTE) e mostra a resposta completa da Vonage na tela — inclui
+  // status de aceite síncrono; a rejeição real (se houver) só aparece no
+  // webhook /api/webhooks/vonage-status, ver Logs da Vercel. Remover este
+  // bloco depois que os 4 templates estiverem confirmados entregando.
+  const TEST_TEMPLATES: Record<string, { template: string; sector: string; valor: string }> = {
+    'Crítico': { template: 'alerta_critico_energia', sector: 'UTI QG', valor: '125.45' },
+    'Imagem': { template: 'alerta_imagem_energia', sector: 'TOMOGRAFIA', valor: '340.20' },
+    'HVAC': { template: 'alerta_hvac_energia', sector: 'HVAC LAVANDERIA', valor: '18.90' },
+    'Infra': { template: 'alerta_infra_energia', sector: 'LAVANDERIA', valor: '62.30' },
+  };
+
+  const handleTestTemplate = async (type: string) => {
+    const cfg = TEST_TEMPLATES[type];
+    setTestingType(type);
     setTestResult(null);
     try {
       const phone = phoneNumbers.join(',') || localStorage.getItem('notify_phone_number') || '5511949102183';
@@ -64,23 +72,23 @@ export function SettingsView() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sector: 'LABORATÓRIO (TESTE)',
-          message: 'Mensagem de teste de diagnóstico do template do Laboratório — pode ignorar.',
-          valor: '0,1',
+          sector: `${cfg.sector} (TESTE)`,
+          message: `Mensagem de teste de diagnóstico do template ${type} — pode ignorar.`,
+          valor: cfg.valor,
           phone,
           appId,
           privateKey,
           whatsappFrom,
-          templateOverride: 'setor_laboratorio_alerta_energia2',
-          templateParams: ['LABORATÓRIO - TESTE', '0,1'],
+          templateOverride: cfg.template,
+          templateParams: [cfg.sector, cfg.valor],
         }),
       });
       const data = await response.json();
-      setTestResult(JSON.stringify(data, null, 2));
+      setTestResult(JSON.stringify({ tipo: type, template: cfg.template, ...data }, null, 2));
     } catch (e: any) {
       setTestResult(`Erro de rede ao chamar /api/notify: ${e?.message || e}`);
     } finally {
-      setTestingLab(false);
+      setTestingType(null);
     }
   };
 
@@ -210,27 +218,34 @@ export function SettingsView() {
         </div>
       </div>
 
-      {/* Diagnóstico temporário — remover quando o template do Laboratório
-          estiver confirmado entregando. */}
+      {/* Diagnóstico temporário — remover quando os 4 templates novos
+          estiverem confirmados entregando. */}
       <div className="chart-container border-amber-500/30 bg-amber-950/10">
         <h3 className="text-lg font-medium text-gray-200 mb-2 flex items-center gap-2">
           <FlaskConical className="w-5 h-5 text-amber-400" />
-          Diagnóstico (temporário): template do Laboratório
+          Diagnóstico (temporário): templates por tipo
         </h3>
         <p className="text-xs text-gray-500 mb-4">
-          Dispara um envio de teste real (valores fictícios, marcados como TESTE) direto pro template
-          <code className="mx-1 text-amber-300">setor_laboratorio_alerta_energia2</code>
-          pros números cadastrados acima, e mostra a resposta completa da API — incluindo o erro exato
-          da Vonage/Meta se falhar. Esse bloco é só pra investigação e será removido depois.
+          Dispara um envio de teste real (valores fictícios, marcados como TESTE) direto pro template do
+          tipo escolhido (<code className="text-amber-300">alerta_critico_energia</code>,{' '}
+          <code className="text-amber-300">alerta_imagem_energia</code>,{' '}
+          <code className="text-amber-300">alerta_hvac_energia</code> ou{' '}
+          <code className="text-amber-300">alerta_infra_energia</code>) pros números cadastrados acima, e
+          mostra a resposta completa da API. Esse bloco é só pra investigação e será removido depois.
         </p>
-        <button
-          onClick={handleTestLabTemplate}
-          disabled={testingLab}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 rounded-md border border-amber-500/30 font-medium transition-colors text-sm disabled:opacity-50"
-        >
-          <FlaskConical className="w-4 h-4" />
-          {testingLab ? 'Enviando teste...' : 'Testar template Laboratório'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {Object.keys(TEST_TEMPLATES).map((type) => (
+            <button
+              key={type}
+              onClick={() => handleTestTemplate(type)}
+              disabled={testingType !== null}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 rounded-md border border-amber-500/30 font-medium transition-colors text-sm disabled:opacity-50"
+            >
+              <FlaskConical className="w-4 h-4" />
+              {testingType === type ? 'Enviando...' : `Testar ${type}`}
+            </button>
+          ))}
+        </div>
         {testResult && (
           <pre className="mt-4 p-3 bg-[#0a0a0c] border border-[#333] rounded-md text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap">
             {testResult}

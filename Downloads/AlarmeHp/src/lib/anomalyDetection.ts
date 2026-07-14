@@ -10,42 +10,43 @@ export function getBand(hour: number): TimeBand {
 }
 
 // `template`: nome (sem namespace) de um WhatsApp Message Template
-// específico aprovado pra esse setor, com 2 parâmetros (setor, valor com
-// unidade) — quando ausente, o alerta usa o template genérico
-// "sistema_de_alerta" (3 parâmetros: hora, setor, valor), que é o único
-// verificado end-to-end. Os demais templates específicos (setor_cme_*,
-// setor_radiologia_*, setor_oncologia_*, setor_refeitorio_*,
-// setor_imaging_*, setor_infra_*, setor_hvac_*) foram removidos daqui por
-// nunca terem sido confirmados entregando — só setor_laboratorio_alerta_energia2
-// segue mapeado, e mesmo esse cai pro "sistema_de_alerta" se falhar (ver
-// api/app.ts). Os templates em si continuam existindo no Meta Business
-// Manager / Vonage; removê-los de lá (se quiser) é uma ação manual fora
-// deste código.
+// aprovado pra esse setor, com 2 parâmetros (setor, valor). Os templates
+// antigos por setor (setor_laboratorio_alerta_energia2 e cia) foram criados
+// na WABA errada dentro da Business Manager "Carbono Zero" (que tem 3 WABAs
+// com o mesmo nome) — por isso rejeitavam sempre ("template ... does not
+// exist"). Foram substituídos por 4 templates novos, um por `type`, criados
+// já na WABA correta (101201763028051, a mesma do "sistema_de_alerta" que
+// funciona): alerta_critico_energia, alerta_imagem_energia,
+// alerta_hvac_energia, alerta_infra_energia. Se o template específico falhar
+// por qualquer motivo (ex: ainda em análise na Meta), o backend cai
+// automaticamente pro "sistema_de_alerta" antes de desistir pro SMS (ver
+// api/app.ts) — então a falta de aprovação de um desses 4 não interrompe o
+// envio, só faz o alerta sair no formato antigo até ser aprovado.
 export const SECTOR_MAPPING: Record<string, { label: string; sub?: string; type: string; template?: string }> = {
-  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra' },
-  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico' },
-  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico', template: 'setor_laboratorio_alerta_energia2' },
-  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra' },
-  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico' },
-  'SADT': { label: 'SADT', type: 'Crítico' },
-  'ME_UTI_QG_E3': { label: 'UTI QG', sub: 'ME_CLIM_UTI', type: 'Crítico' },
-  'ME_UTI_QD_IT': { label: 'UTI QD IT', sub: 'ME_CLIM_UTI', type: 'Crítico' },
-  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem' },
-  'DJ60_RM': { label: 'Ressonância', type: 'Imagem' },
-  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem' },
-  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem' },
-  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem' },
+  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra', template: 'alerta_infra_energia' },
+  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico', template: 'alerta_critico_energia' },
+  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico', template: 'alerta_critico_energia' },
+  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra', template: 'alerta_infra_energia' },
+  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico', template: 'alerta_critico_energia' },
+  'SADT': { label: 'SADT', type: 'Crítico', template: 'alerta_critico_energia' },
+  'ME_UTI_QG_E3': { label: 'UTI QG', sub: 'ME_CLIM_UTI', type: 'Crítico', template: 'alerta_critico_energia' },
+  'ME_UTI_QD_IT': { label: 'UTI QD IT', sub: 'ME_CLIM_UTI', type: 'Crítico', template: 'alerta_critico_energia' },
+  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem', template: 'alerta_imagem_energia' },
+  'DJ60_RM': { label: 'Ressonância', type: 'Imagem', template: 'alerta_imagem_energia' },
+  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem', template: 'alerta_imagem_energia' },
+  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem', template: 'alerta_imagem_energia' },
+  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem', template: 'alerta_imagem_energia' },
   // Submetição de climatização promovida a setor próprio de alerta — os
   // dados já vêm na planilha (usados até aqui só como referência cruzada
   // via `sub`), mas nunca foram avaliados como anomalia independente.
-  'ME_CLIM_ONC_A_T': { label: 'HVAC Oncologia', type: 'HVAC' },
-  'ME_CLIM_REF': { label: 'HVAC Refeitório', type: 'HVAC' },
-  'ME_CLIM_LAVANDERIA': { label: 'HVAC Lavanderia', type: 'HVAC' },
-  'ME_CLIM_UTI': { label: 'HVAC UTI', type: 'HVAC' },
-  'ME_CLIM_CC_CO_CME': { label: 'HVAC CME', type: 'HVAC' },
-  'ME_CLIM_EMERGENCIA': { label: 'HVAC Emergência', type: 'HVAC' },
-  'ME_CLIM_AMBULATORIO': { label: 'HVAC Ambulatório', type: 'HVAC' },
-  'ME_CLIM_LABORATORIO': { label: 'HVAC Laboratório', type: 'HVAC' },
+  'ME_CLIM_ONC_A_T': { label: 'HVAC Oncologia', type: 'HVAC', template: 'alerta_hvac_energia' },
+  'ME_CLIM_REF': { label: 'HVAC Refeitório', type: 'HVAC', template: 'alerta_hvac_energia' },
+  'ME_CLIM_LAVANDERIA': { label: 'HVAC Lavanderia', type: 'HVAC', template: 'alerta_hvac_energia' },
+  'ME_CLIM_UTI': { label: 'HVAC UTI', type: 'HVAC', template: 'alerta_hvac_energia' },
+  'ME_CLIM_CC_CO_CME': { label: 'HVAC CME', type: 'HVAC', template: 'alerta_hvac_energia' },
+  'ME_CLIM_EMERGENCIA': { label: 'HVAC Emergência', type: 'HVAC', template: 'alerta_hvac_energia' },
+  'ME_CLIM_AMBULATORIO': { label: 'HVAC Ambulatório', type: 'HVAC', template: 'alerta_hvac_energia' },
+  'ME_CLIM_LABORATORIO': { label: 'HVAC Laboratório', type: 'HVAC', template: 'alerta_hvac_energia' },
 };
 
 export interface SectorStats {
