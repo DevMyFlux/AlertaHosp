@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatStandardAlertMessage, getActionText, SectorAnomaly } from '../lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatConsumoExcedenteParam, formatImpactoMensalParam, formatStandardAlertMessage, getActionText, getAlertMarginPct, SectorAnomaly } from '../lib/anomalyDetection';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send, Clock, RefreshCw, Database } from 'lucide-react';
 
 interface Props {
@@ -23,7 +23,12 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
       const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
       const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
       const templateParams = anomaly.templateOverride
-        ? [formatSetorNomeParam(anomaly.sectorName), formatValorComUnidadeParam(anomaly.val)]
+        ? [
+            formatDataHoraParam(anomaly),
+            formatSetorNomeParam(anomaly.sectorName),
+            formatConsumoExcedenteParam(anomaly),
+            formatImpactoMensalParam(anomaly),
+          ]
         : undefined;
       const response = await fetch('/api/notify', {
         method: 'POST',
@@ -56,7 +61,7 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
     // Mesma base estatística (por setor e turno) usada no Relatório de
     // Diagnóstico da IA, aplicada apenas ao último registro de 15 minutos.
     const sStats = buildSectorBandStats(data);
-    const alerts = detectSectorAnomalies(last, sStats);
+    const alerts = detectSectorAnomalies(last, sStats, data);
     alerts.sort((a, b) => b.deviation - a.deviation);
 
     const total = Number(last.Total_Consumption || 0);
@@ -216,9 +221,27 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
                          <div className="text-gray-300 font-mono text-sm">{formatKw(alert.mean)} kWh</div>
                        </div>
                        <div>
-                         <div className="text-gray-500 text-[10px] mb-1">LIMITE DISPARO (1,5σ)</div>
-                         <div className="text-gray-400 font-mono text-sm">{formatKw(alert.expectedMax)} kWh</div>
+                         <div className="text-gray-500 text-[10px] mb-1">
+                           PADRÃO ESPERADO ({alert.representativeMetric === 'mean' ? 'média' : alert.representativeMetric === 'median' ? 'mediana' : 'moda'})
+                         </div>
+                         <div className="text-gray-300 font-mono text-sm">{formatKw(alert.centralValue)} kWh</div>
                        </div>
+                       <div>
+                         <div className="text-gray-500 text-[10px] mb-1">LIMITE DISPARO (padrão +{getAlertMarginPct()}%)</div>
+                         <div className="text-gray-400 font-mono text-sm">{formatKw(alert.expectedMax)} kWh{alert.crossValidated ? ' · confirmado por 2 métricas' : ''}</div>
+                       </div>
+                       <div>
+                         <div className="text-gray-500 text-[10px] mb-1">IMPACTO FINANCEIRO PROJETADO/MÊS</div>
+                         <div className="text-amber-400 font-mono text-sm">
+                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(alert.projecaoMensalBRL)}
+                         </div>
+                       </div>
+                       {alert.frequenciaHistorica > 0 && (
+                         <div>
+                           <div className="text-gray-500 text-[10px] mb-1">OCORRÊNCIAS (30 DIAS)</div>
+                           <div className="text-gray-400 font-mono text-sm">{alert.frequenciaHistorica}x neste setor/turno</div>
+                         </div>
+                       )}
                     </div>
                   </div>
                 </div>

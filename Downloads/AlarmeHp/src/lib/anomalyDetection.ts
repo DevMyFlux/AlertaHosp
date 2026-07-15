@@ -1,4 +1,7 @@
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
+import { analyzeDistribution, DistributionStats, calcTrendSlope, RepresentativeMetric } from './statistics';
+import { calcFinancialImpact, formatBRL, BAND_DURATION_HOURS } from './costEstimation';
+import { getAlertLogSince } from './alertLog';
 
 export type TimeBand = 'Café da Manhã (07-10h)' | 'Almoço (10-14h)' | 'Jantar (18-22h)' | 'Demais Horários';
 
@@ -16,65 +19,80 @@ export function getBand(hour: number): TimeBand {
 // com o mesmo nome) — por isso rejeitavam sempre ("template ... does not
 // exist"). Foram substituídos por 4 templates novos, um por `type`, criados
 // já na WABA correta (101201763028051, a mesma do "sistema_de_alerta" que
-// funciona): alerta_critico_energia, alerta_imagem_energia,
-// alerta_hvac_energia, alerta_infra_energia. Se o template específico falhar
-// por qualquer motivo (ex: ainda em análise na Meta), o backend cai
-// automaticamente pro "sistema_de_alerta" antes de desistir pro SMS (ver
-// api/app.ts) — então a falta de aprovação de um desses 4 não interrompe o
-// envio, só faz o alerta sair no formato antigo até ser aprovado.
+// funciona). Os nomes originais (alerta_critico_energia e cia, com corpo de
+// 2 variáveis) já existiam na WABA e a Meta não permite recriar um template
+// com o mesmo nome — por isso a versão com o corpo novo (4 variáveis, tom
+// revisado) usa o sufixo _v2: alerta_critico_energia_v2,
+// alerta_imagem_energia_v2, alerta_hvac_energia_v2, alerta_infra_energia_v2.
+// Se o template específico falhar por qualquer motivo (ex: ainda em análise
+// na Meta), o backend cai automaticamente pro "sistema_de_alerta" antes de
+// desistir pro SMS (ver api/app.ts) — então a falta de aprovação de um
+// desses 4 não interrompe o envio, só faz o alerta sair no formato antigo
+// até ser aprovado.
 export const SECTOR_MAPPING: Record<string, { label: string; sub?: string; type: string; template?: string }> = {
-  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra', template: 'alerta_infra_energia' },
-  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico', template: 'alerta_critico_energia' },
-  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico', template: 'alerta_critico_energia' },
-  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra', template: 'alerta_infra_energia' },
-  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico', template: 'alerta_critico_energia' },
-  'SADT': { label: 'SADT', type: 'Crítico', template: 'alerta_critico_energia' },
-  'ME_UTI_QG_E3': { label: 'UTI QG', sub: 'ME_CLIM_UTI', type: 'Crítico', template: 'alerta_critico_energia' },
-  'ME_UTI_QD_IT': { label: 'UTI QD IT', sub: 'ME_CLIM_UTI', type: 'Crítico', template: 'alerta_critico_energia' },
-  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem', template: 'alerta_imagem_energia' },
-  'DJ60_RM': { label: 'Ressonância', type: 'Imagem', template: 'alerta_imagem_energia' },
-  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem', template: 'alerta_imagem_energia' },
-  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem', template: 'alerta_imagem_energia' },
-  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem', template: 'alerta_imagem_energia' },
+  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra', template: 'alerta_infra_energia_v2' },
+  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico', template: 'alerta_critico_energia_v2' },
+  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico', template: 'alerta_critico_energia_v2' },
+  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra', template: 'alerta_infra_energia_v2' },
+  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico', template: 'alerta_critico_energia_v2' },
+  'SADT': { label: 'SADT', type: 'Crítico', template: 'alerta_critico_energia_v2' },
+  'ME_UTI_QG_E3': { label: 'UTI QG', sub: 'ME_CLIM_UTI', type: 'Crítico', template: 'alerta_critico_energia_v2' },
+  'ME_UTI_QD_IT': { label: 'UTI QD IT', sub: 'ME_CLIM_UTI', type: 'Crítico', template: 'alerta_critico_energia_v2' },
+  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem', template: 'alerta_imagem_energia_v2' },
+  'DJ60_RM': { label: 'Ressonância', type: 'Imagem', template: 'alerta_imagem_energia_v2' },
+  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem', template: 'alerta_imagem_energia_v2' },
+  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem', template: 'alerta_imagem_energia_v2' },
+  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem', template: 'alerta_imagem_energia_v2' },
   // Submetição de climatização promovida a setor próprio de alerta — os
   // dados já vêm na planilha (usados até aqui só como referência cruzada
   // via `sub`), mas nunca foram avaliados como anomalia independente.
-  'ME_CLIM_ONC_A_T': { label: 'HVAC Oncologia', type: 'HVAC', template: 'alerta_hvac_energia' },
-  'ME_CLIM_REF': { label: 'HVAC Refeitório', type: 'HVAC', template: 'alerta_hvac_energia' },
-  'ME_CLIM_LAVANDERIA': { label: 'HVAC Lavanderia', type: 'HVAC', template: 'alerta_hvac_energia' },
-  'ME_CLIM_UTI': { label: 'HVAC UTI', type: 'HVAC', template: 'alerta_hvac_energia' },
-  'ME_CLIM_CC_CO_CME': { label: 'HVAC CME', type: 'HVAC', template: 'alerta_hvac_energia' },
-  'ME_CLIM_EMERGENCIA': { label: 'HVAC Emergência', type: 'HVAC', template: 'alerta_hvac_energia' },
-  'ME_CLIM_AMBULATORIO': { label: 'HVAC Ambulatório', type: 'HVAC', template: 'alerta_hvac_energia' },
-  'ME_CLIM_LABORATORIO': { label: 'HVAC Laboratório', type: 'HVAC', template: 'alerta_hvac_energia' },
+  'ME_CLIM_ONC_A_T': { label: 'HVAC Oncologia', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
+  'ME_CLIM_REF': { label: 'HVAC Refeitório', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
+  'ME_CLIM_LAVANDERIA': { label: 'HVAC Lavanderia', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
+  'ME_CLIM_UTI': { label: 'HVAC UTI', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
+  'ME_CLIM_CC_CO_CME': { label: 'HVAC CME', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
+  'ME_CLIM_EMERGENCIA': { label: 'HVAC Emergência', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
+  'ME_CLIM_AMBULATORIO': { label: 'HVAC Ambulatório', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
+  'ME_CLIM_LABORATORIO': { label: 'HVAC Laboratório', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
 };
 
-export interface SectorStats {
-  mean: number;
-  median: number;
-  stdDev: number;
-  min: number;
-  max: number;
-}
+// Estatística por setor/turno — desde a Etapa 2 da refatoração, isso é só um
+// alias pro pacote completo de src/lib/statistics.ts (média, mediana, moda,
+// desvio-padrão, MAD, assimetria, métrica auto-selecionada etc). Mantido com
+// esse nome pra não quebrar quem importava `SectorStats` daqui.
+export type SectorStats = DistributionStats;
 
+// Mantida por compatibilidade — agora delega pro motor estatístico único
+// (statistics.ts). Antes calculava só média/mediana/desvio aqui mesmo, uma
+// de três implementações duplicadas no sistema (as outras eram
+// ActiveAnomalies.tsx e ImagingView.tsx, ambas também migradas).
 export function calcStats(vals: number[]): SectorStats {
-  if (!vals.length) return { mean: 0, median: 0, stdDev: 0, min: 0, max: 0 };
-  const sorted = [...vals].sort((a, b) => a - b);
-  const sum = sorted.reduce((a, b) => a + b, 0);
-  const mean = sum / sorted.length;
-  const median = sorted[Math.floor(sorted.length / 2)];
-  const variance = sorted.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / sorted.length;
-  const stdDev = Math.sqrt(variance);
-  const min = sorted[0];
-  const max = sorted[sorted.length - 1];
-  return { mean, median, stdDev, min, max };
+  return analyzeDistribution(vals);
 }
 
-// Constrói média/mediana/desvio-padrão por setor e turno (janela de horário),
-// usando todo o histórico disponível — a mesma base estatística usada tanto
-// pela análise pontual (LiveMonitorView) quanto pelo relatório histórico
-// (DiagnosticsView), evitando que as duas telas divirjam nos critérios de
-// anomalia.
+// Amostras mínimas por setor+turno pra confiar na estatística. Com menos que
+// isso, média/mediana/moda ficam instáveis demais pra servir de base de
+// comparação — o setor simplesmente não gera anomalia até acumular histórico
+// suficiente (evita falso positivo por dado escasso, não por comportamento
+// realmente anômalo).
+const MIN_SAMPLES = 4;
+
+// Janela de base pro cálculo de média/mediana/moda: sempre os últimos 1000
+// registros de cada setor+turno, nunca o histórico inteiro. Com leituras de
+// 15 em 15 minutos, 1000 registros de um mesmo turno cobrem várias semanas —
+// bastante pra estatística ser confiável, sem carregar histórico antigo
+// demais (comportamento de consumo muda com o tempo: reforma, novo
+// equipamento, mudança de uso do setor etc). Pedido explícito do cliente.
+const BASELINE_WINDOW = 1000;
+
+// Constrói a estatística completa (Etapa 2) por setor e turno (janela de
+// horário), usando sempre os últimos BASELINE_WINDOW registros de cada
+// grupo — a mesma base usada tanto pela análise pontual (LiveMonitorView)
+// quanto pelo relatório histórico (DiagnosticsView) e pela Visão Executiva
+// (ActiveAnomalies.tsx), evitando que as telas divirjam nos critérios de
+// anomalia. `data` deve vir ordenado do mais antigo pro mais recente (mesmo
+// formato que processCumulativeData já produz) — assim, cortar os últimos
+// BASELINE_WINDOW de cada grupo pega sempre os mais recentes.
 export function buildSectorBandStats(data: ProcessedTelemetryData[]): Record<string, Record<TimeBand, SectorStats>> {
   const histData: Record<string, Record<TimeBand, number[]>> = {};
   ALL_SECTORS.forEach(sec => {
@@ -100,14 +118,36 @@ export function buildSectorBandStats(data: ProcessedTelemetryData[]): Record<str
   ALL_SECTORS.forEach(sec => {
     sStats[sec] = {} as Record<TimeBand, SectorStats>;
     (Object.keys(histData[sec]) as TimeBand[]).forEach(band => {
-      sStats[sec][band] = calcStats(histData[sec][band]);
+      const ultimosMil = histData[sec][band].slice(-BASELINE_WINDOW);
+      sStats[sec][band] = analyzeDistribution(ultimosMil);
     });
   });
 
   return sStats;
 }
 
+// Margem de alerta (%): quanto o valor novo precisa passar do padrão
+// esperado (média/mediana/moda) pra virar alerta. Configurável na tela de
+// Configurações (fica salva no navegador); 20% é o padrão até o usuário
+// ajustar. Regra simples de propósito — "alerta se passar a média em X%" —
+// pra ser fácil de explicar pra quem não é da área técnica.
+const DEFAULT_ALERT_MARGIN_PCT = 20;
+const MARGIN_STORAGE_KEY = 'alert_margin_pct';
+
+export function getAlertMarginPct(): number {
+  try {
+    const saved = localStorage.getItem(MARGIN_STORAGE_KEY);
+    const parsed = saved ? Number(String(saved).replace(',', '.')) : NaN;
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  } catch {
+    // localStorage indisponível — cai pro padrão
+  }
+  return DEFAULT_ALERT_MARGIN_PCT;
+}
+
 export interface SectorAnomaly {
+  // Campos originais — mantidos com o mesmo nome/tipo pra não quebrar
+  // LiveMonitorView, DiagnosticsView, ActiveAnomalies, alertLog etc.
   date: string;
   time: string;
   band: TimeBand;
@@ -115,8 +155,18 @@ export interface SectorAnomaly {
   sectorKey: string;
   type: string;
   val: number;
+  /** Média aritmética histórica do setor/turno (sempre a média "clássica",
+   *  independente da métrica auto-selecionada). Exibida como "MÉDIA
+   *  HISTÓRICA" no Monitoramento 15m. */
   mean: number;
+  /** Limiar de disparo: padrão esperado (centralValue) × (1 + margem de
+   *  erro configurável em Configurações, padrão 20%). Exibido como "LIMITE
+   *  DISPARO" / "Lim. Estatístico". */
   expectedMax: number;
+  /** % que o consumo está acima do PADRÃO ESPERADO (centralValue) — não do
+   *  limiar de disparo. Antes da Etapa 2 esse campo media a distância até o
+   *  limiar (upperLimit), o que não batia com o texto exibido nas telas
+   *  ("desvio em relação à média esperada"); agora mede exatamente isso. */
   deviation: number;
   severity: 'Moderado' | 'Alto' | 'Crítico';
   subVal: number;
@@ -125,9 +175,43 @@ export interface SectorAnomaly {
   // Nome (sem namespace) de um template específico pra esse setor, se
   // configurado em SECTOR_MAPPING. Ausente = usa o "sistema_de_alerta".
   templateOverride?: string;
+
+  // --- Campos novos (Etapa 2/4/5 da refatoração) ---
+  /** Métrica auto-selecionada como mais representativa do comportamento
+   *  normal desse setor/turno: 'mean' (distribuição simétrica), 'median'
+   *  (muitos outliers/assimetria) ou 'mode' (comportamento repetitivo). */
+  representativeMetric: RepresentativeMetric;
+  /** Valor da métrica escolhida — o "padrão esperado" usado em todos os
+   *  cálculos de excedente/custo/percentual. */
+  centralValue: number;
+  /** true se a anomalia também é confirmada usando a média aritmética pura
+   *  como padrão esperado (em vez da métrica auto-selecionada), com a
+   *  mesma margem %. Cross-validação pedida na Etapa 2 pra aumentar a
+   *  confiabilidade — não suprime a anomalia quando as métricas discordam,
+   *  só sinaliza. */
+  crossValidated: boolean;
+  /** Consumo excedente estimado no intervalo de 15 min (kWh). */
+  excedenteKwh: number;
+  /** Custo estimado do excesso apenas neste intervalo (R$). */
+  custoEstimadoBRL: number;
+  /** Projeção financeira mensal (R$) caso esse padrão se repita todo dia
+   *  durante o mesmo turno em que foi detectado. */
+  projecaoMensalBRL: number;
+  /** Tarifa (R$/kWh) usada nos cálculos acima — ver src/lib/costEstimation.ts
+   *  (hoje é um valor de mercado genérico, não a tarifa real do contrato). */
+  tarifaUsadaBRL: number;
+  /** Quantas vezes esse mesmo setor+turno já gerou alerta nos últimos 30
+   *  dias (via src/lib/alertLog.ts). */
+  frequenciaHistorica: number;
+  /** Tendência recente do setor (regressão linear normalizada sobre as
+   *  últimas leituras): positiva = subindo, negativa = caindo, perto de
+   *  zero = estável. Ver ressalva sobre janela curta de dados no resumo da
+   *  refatoração. */
+  trendSlope: number;
 }
 
 const kwhFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+const pctFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 
 // Monta os parâmetros {{2}} (setor) e {{3}} (valor) do template WhatsApp
 // "sistema_de_alerta". O texto fixo aprovado na Meta é uma frase pronta
@@ -145,12 +229,12 @@ export function formatValorParam(val: number, _expectedMax: number): string {
   return kwhFormatter.format(val);
 }
 
-// Parâmetros {{1}}/{{2}} do template setor_laboratorio_alerta_energia2 (nome
-// do setor, valor). Confirmado nas "Amostras de variáveis" do template
-// aprovado: {{1}} = "LABORATÓRIO" (setor em maiúsculo, sem unidade) e
-// {{2}} = "125.45" (só o número, SEM "kWh" — a unidade já está fixa no
-// corpo do template, logo depois da variável). Antes essa função grudava
-// " kWh" no {{2}}, duplicando a unidade na mensagem final ("125,4 kWh kWh").
+// Parâmetros {{1}}/{{2}} dos templates alerta_*_energia (nome do setor,
+// valor). Confirmado nas "Amostras de variáveis" do template aprovado:
+// {{1}} = "LABORATÓRIO" (setor em maiúsculo, sem unidade) e {{2}} = "125.45"
+// (só o número, SEM "kWh" — a unidade já está fixa no corpo do template,
+// logo depois da variável). Antes essa função grudava " kWh" no {{2}},
+// duplicando a unidade na mensagem final ("125,4 kWh kWh").
 export function formatSetorNomeParam(sectorName: string): string {
   return sectorName.toUpperCase();
 }
@@ -159,162 +243,291 @@ export function formatValorComUnidadeParam(val: number, _unidade: string = 'kWh'
   return kwhFormatter.format(val);
 }
 
-// Mesmo cabeçalho usado no card do Relatório de Diagnóstico da IA — usado no
-// texto que o próprio sistema controla (SMS de fallback, corpo interno da
-// mensagem). O texto FIXO já aprovado dentro de cada template WhatsApp na
-// Meta não pode ser alterado por aqui — só editando o template lá.
+// Parâmetros {{1}}..{{4}} dos templates alerta_critico_energia_v2 /
+// alerta_imagem_energia_v2 / alerta_hvac_energia_v2 / alerta_infra_energia_v2: 4
+// variáveis (data/hora com dia da semana, setor, quanto passou do padrão
+// esperado, impacto mensal projetado). Causas e ação ficam fixas no corpo
+// aprovado de cada template (não são variáveis) — ver getCauseProfile.
+// {{1}} dia da semana + data/hora (ex: "segunda-feira, 14/07 às 05:38")
+export function formatDataHoraParam(anomaly: Pick<SectorAnomaly, 'date' | 'time'>): string {
+  const weekday = getWeekdayPt(anomaly.date);
+  const [ano, mes, dia] = anomaly.date.split('-');
+  const dataFmt = (!ano || !mes || !dia) ? anomaly.date : `${dia}/${mes}`;
+  return `${weekday}, ${dataFmt} às ${anomaly.time}`;
+}
+
+// {{3}} quanto passou do padrão esperado, em % e em kWh na mesma frase
+// (ex: "31% acima do padrão (2,1 kWh no intervalo)").
+export function formatConsumoExcedenteParam(anomaly: Pick<SectorAnomaly, 'deviation' | 'excedenteKwh'>): string {
+  return `${pctFormatter.format(anomaly.deviation)}% acima do padrão (${kwhFormatter.format(anomaly.excedenteKwh)} kWh no intervalo)`;
+}
+
+// {{4}} impacto financeiro projetado por mês, caso o padrão persista todos
+// os dias durante o mesmo turno em que a anomalia foi detectada (ex: "R$
+// 1.240,00/mês (se persistir 8h/dia)").
+export function formatImpactoMensalParam(anomaly: Pick<SectorAnomaly, 'projecaoMensalBRL' | 'band'>): string {
+  const horas = BAND_DURATION_HOURS[anomaly.band] ?? 4;
+  return `${formatBRL(anomaly.projecaoMensalBRL)}/mês (se persistir ${horas}h/dia)`;
+}
+
+// Mesmo cabeçalho usado no card do Relatório de Diagnóstico da IA. Não usado
+// em nenhuma outra parte do sistema hoje (candidato a remoção futura, mas
+// mantido por ora — Etapa 1 pede documentar código morto, não apagar sem
+// justificativa).
 export function formatAlertHeader(sectorName: string): string {
   return `🚨 ALERTA DE ANOMALIA - ${sectorName.toUpperCase()}`;
 }
 
-// Ação de campo recomendada com base no tipo do setor (mesma classificação
-// usada no Monitoramento de 15 Minutos e no Relatório de Diagnóstico da IA).
-export function getActionText(anomaly: Pick<SectorAnomaly, 'type' | 'subName' | 'subVal' | 'subMedian'>): string {
-  if (anomaly.type === 'Crítico') {
-    return "Contatar enfermaria/supervisão local para confirmar o uso extraordinário de equipamentos (suporte à vida). Não desarmar sem validação clínica.";
-  }
-  if (anomaly.type === 'Imagem') {
-    return "Acionar equipe de engenharia clínica. Verificar status do Chiller do equipamento e agendamento de exames em massa.";
-  }
-  if (anomaly.type === 'HVAC') {
-    return "Acionar equipe de facilities (Refrigeração). Verificar limpeza de filtros, setpoint do termostato e possível travamento de compressor.";
-  }
-  if (anomaly.subName && anomaly.subVal > anomaly.subMedian * 1.3) {
-    return "Acionar equipe de facilities (Refrigeração). Verificar possível travamento de compressor ou falha no termostato.";
-  }
-  return "Contatar equipe de manutenção imediatamente.";
+// Diagnóstico de causa/ação por setor ou tipo, em linguagem técnica mas
+// direta — sem jargão de marca/equipamento (ex: "Chiller"), trocado por
+// termos que qualquer pessoa da equipe entende ("sistema de refrigeração do
+// equipamento"). Reescrito a pedido do cliente, que achou a versão anterior
+// simplista demais numas partes e cheia de termos técnicos demais em
+// outras. `contexto` alimenta a frase "normalmente associado a..."
+// (frequência histórica), `causaProvavel` e `acao` alimentam as frases
+// seguintes — ambas usadas tanto na mensagem completa (SMS/interna) quanto,
+// de forma resumida, no corpo fixo dos templates WhatsApp por tipo.
+interface CauseProfile {
+  contexto: string;
+  causaProvavel: string;
+  acao: string;
 }
 
-// Causas prováveis exibidas na mensagem enviada ao destinatário, no mesmo
-// estilo do template aprovado setor_laboratorio_alerta_energia2 (lista fixa
-// de "Possíveis causas"). O Laboratório usa o texto já aprovado ali; os
-// demais setores caem no conjunto padrão do seu `type`.
-const SECTOR_SPECIFIC_CAUSES: Record<string, string[]> = {
-  'DJ13_Laboratorio': [
-    'Equipamentos de análise ligados',
-    'Refrigerador/Freezer com mal funcionamento',
-    'Centrífuga em operação contínua',
-  ],
+// Perfis específicos por setor — sobrepõem o perfil genérico do `type`
+// quando o setor tem uma causa característica conhecida (ex: CME e
+// autoclaves). Chave = sectorKey (mesma chave usada em SECTOR_MAPPING).
+const SECTOR_SPECIFIC_PROFILES: Record<string, CauseProfile> = {
+  'DJ50_CME': {
+    contexto: 'uso simultâneo de autoclaves e climatização fora da curva',
+    causaProvavel: 'carga térmica elevada ou equipamento de processo operando fora do comportamento habitual',
+    acao: 'Recomenda-se verificar a climatização local e os equipamentos de apoio (autoclaves).',
+  },
+  'DJ13_Laboratorio': {
+    contexto: 'uso simultâneo de equipamentos de análise e refrigeração',
+    causaProvavel: 'equipamentos de análise em operação contínua ou falha em refrigerador/freezer',
+    acao: 'Recomenda-se verificar os equipamentos de análise em uso e o funcionamento dos refrigeradores/freezers do setor.',
+  },
 };
 
-const TYPE_CAUSES: Record<string, string[]> = {
-  'Crítico': [
-    'Equipamento de suporte à vida em uso intensivo',
-    'Pico de demanda simultânea de múltiplos equipamentos',
-    'Possível falha elétrica local (curto-circuito)',
-  ],
-  'Imagem': [
-    'Exame de alta demanda energética em andamento',
-    'Chiller do equipamento em sobrecarga',
-    'Acúmulo de exames agendados no mesmo intervalo',
-  ],
-  'HVAC': [
-    'Compressor travado ou ciclando incorretamente',
-    'Filtros de ar sujos forçando o equipamento',
-    'Termostato com setpoint incorreto',
-  ],
-  'Infra': [
-    'Equipamentos/máquinas ligados fora do horário',
-    'Iluminação ou ar-condicionado esquecido ligado',
-    'Uso simultâneo de múltiplos equipamentos de grande porte',
-  ],
+const TYPE_PROFILES: Record<string, CauseProfile> = {
+  'Crítico': {
+    contexto: 'uso simultâneo de equipamentos de suporte à vida acima do padrão habitual',
+    causaProvavel: 'carga elevada de equipamentos essenciais ou pico de demanda simultânea',
+    acao: 'Recomenda-se confirmar com a enfermaria ou supervisão do setor o uso extraordinário de equipamentos. Evitar desligamentos sem validação clínica.',
+  },
+  'Imagem': {
+    contexto: 'exames de alta demanda em sequência ou sobrecarga do sistema de refrigeração do equipamento',
+    causaProvavel: 'carga térmica do equipamento ou exame de longa duração fora do padrão',
+    acao: 'Recomenda-se verificar o sistema de refrigeração do equipamento e a agenda de exames do período.',
+  },
+  'HVAC': {
+    contexto: 'climatização operando fora da curva normal',
+    causaProvavel: 'carga térmica elevada ou equipamento de climatização fora do padrão de funcionamento',
+    acao: 'Recomenda-se verificar filtros, compressor e o ajuste do termostato do sistema de climatização.',
+  },
+  'Infra': {
+    contexto: 'uso de equipamentos ou iluminação fora do horário habitual',
+    causaProvavel: 'equipamento ou iluminação em operação fora do horário previsto',
+    acao: 'Recomenda-se verificar equipamentos e iluminação do setor.',
+  },
 };
 
-export function getPossibleCauses(anomaly: Pick<SectorAnomaly, 'sectorKey' | 'type'>): string[] {
-  return SECTOR_SPECIFIC_CAUSES[anomaly.sectorKey] || TYPE_CAUSES[anomaly.type] || TYPE_CAUSES['Infra'];
+export function getCauseProfile(
+  anomaly: Pick<SectorAnomaly, 'sectorKey' | 'type' | 'subName' | 'subVal' | 'subMedian'>
+): CauseProfile {
+  const specific = SECTOR_SPECIFIC_PROFILES[anomaly.sectorKey];
+  if (specific) return specific;
+
+  const base = TYPE_PROFILES[anomaly.type] || TYPE_PROFILES['Infra'];
+
+  // Climatização puxando a carga num setor sem perfil específico próprio:
+  // reaproveita a causa provável do tipo, mas troca o contexto/ação pra
+  // apontar direto pra climatização (mesmo texto pedido pelo cliente).
+  if (anomaly.subName && anomaly.subVal > anomaly.subMedian * 1.3) {
+    return {
+      contexto: 'climatização operando fora da curva normal',
+      causaProvavel: base.causaProvavel,
+      acao: 'Recomenda-se verificar climatização local e equipamentos de apoio.',
+    };
+  }
+
+  return base;
+}
+
+// Ação de campo recomendada com base no setor/tipo (mesma classificação
+// usada no Monitoramento de 15 Minutos e no Relatório de Diagnóstico da IA).
+export function getActionText(
+  anomaly: Pick<SectorAnomaly, 'sectorKey' | 'type' | 'subName' | 'subVal' | 'subMedian'>
+): string {
+  return getCauseProfile(anomaly).acao;
+}
+
+// Nome do dia da semana em português a partir de uma data "YYYY-MM-DD" —
+// usado na frase de abertura da mensagem (Etapa 4: "...para segunda-feira
+// às 05:38"). Meio-dia fixo evita problemas de fuso na conversão.
+function getWeekdayPt(dateStr: string): string {
+  try {
+    const d = new Date(`${dateStr}T12:00:00`);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('pt-BR', { weekday: 'long' });
+  } catch {
+    return dateStr;
+  }
 }
 
 // Corpo da mensagem efetivamente recebida pelo destinatário via SMS de
 // fallback (quando o template WhatsApp falha) e também usado como registro
-// interno do alerta — segue o mesmo padrão visual do template aprovado
-// setor_laboratorio_alerta_energia2: cabeçalho, setor, consumo, causas
-// prováveis, ação e assinatura. O corpo do template WhatsApp em si (texto
-// fixo aprovado na Meta) não é alterado por aqui.
-export function formatStandardAlertMessage(
-  anomaly: Pick<SectorAnomaly, 'sectorKey' | 'sectorName' | 'type' | 'val' | 'subName' | 'subVal' | 'subMedian'>
-): string {
+// interno do alerta. Reescrito no formato pedido pelo cliente: 3 parágrafos
+// corridos (sem lista de tópicos), linguagem técnica mas direta, sem jargão
+// de equipamento. O corpo dos templates WhatsApp em si (texto fixo aprovado
+// na Meta) não é alterado por aqui — só os parâmetros {{n}} enviados a eles.
+export function formatStandardAlertMessage(anomaly: SectorAnomaly): string {
   const setor = anomaly.sectorName.toUpperCase();
-  const causas = getPossibleCauses(anomaly);
-  const acao = getActionText(anomaly);
+  const perfil = getCauseProfile(anomaly);
+  const weekday = getWeekdayPt(anomaly.date);
+  const horasTurno = BAND_DURATION_HOURS[anomaly.band] ?? 4;
+
+  const paragrafo1 = anomaly.frequenciaHistorica > 0
+    ? `O consumo do ${setor} está ${pctFormatter.format(anomaly.deviation)}% acima do padrão esperado para ${weekday} às ${anomaly.time}. Este padrão já ocorreu ${anomaly.frequenciaHistorica} ${anomaly.frequenciaHistorica === 1 ? 'vez' : 'vezes'} nos últimos 30 dias, normalmente associado a ${perfil.contexto}.`
+    : `O consumo do ${setor} está ${pctFormatter.format(anomaly.deviation)}% acima do padrão esperado para ${weekday} às ${anomaly.time}. Não há registro de ocorrências semelhantes nos últimos 30 dias — pode ser um evento pontual ou o início de um novo padrão.`;
+
+  const paragrafo2 = `Causa provável: ${perfil.causaProvavel}. ${perfil.acao}`;
+
+  const paragrafo3 = `Consumo excedente estimado: ${kwhFormatter.format(anomaly.excedenteKwh)} kWh no intervalo. Se o padrão persistir por ${horasTurno}h/dia, impacto projetado: ${formatBRL(anomaly.projecaoMensalBRL)}/mês.`;
+
   return [
     `⚠️ ALERTA - ${setor}`,
-    `Consumo anômalo de energia detectado!`,
     ``,
-    `Setor: ${setor}`,
-    `Consumo: ${kwhFormatter.format(anomaly.val)} kWh (últimos 15 min)`,
+    paragrafo1,
     ``,
-    `Possíveis causas:`,
-    ...causas.map(c => `- ${c}`),
+    paragrafo2,
     ``,
-    `Ação: ${acao}`,
+    paragrafo3,
+    ``,
     `Equipe Carbono Zero`,
   ].join('\n');
 }
 
-// Texto de diagnóstico simples (sem tendência histórica) para o alerta
-// automático disparado em background, sem interação do usuário.
+// Texto de diagnóstico simples (sem tendência histórica), não usado em
+// nenhuma tela hoje — candidato a remoção futura (ver nota em
+// formatAlertHeader). Mantido funcional e coerente com os novos campos.
 export function getDiagnosticText(anomaly: SectorAnomaly): string {
-  return `Identificado pico crítico de consumo. O setor está operando com ${kwhFormatter.format(anomaly.val)} kWh no intervalo de 15 minutos, ${kwhFormatter.format(anomaly.deviation)}% acima do limite esperado de ${kwhFormatter.format(anomaly.expectedMax)} kWh.`;
+  return `Identificado pico crítico de consumo. O setor está operando com ${kwhFormatter.format(anomaly.val)} kWh no intervalo de 15 minutos, ${pctFormatter.format(anomaly.deviation)}% acima do padrão esperado de ${kwhFormatter.format(anomaly.centralValue)} kWh.`;
 }
+
+// Abaixo disso (kWh) não vale a pena alertar mesmo que ultrapasse a margem
+// — ruído de setores com consumo residual muito baixo.
+const ABS_FLOOR_KWH = 5;
+// Janela de leituras recentes usada pra estimar tendência (Etapa 5) — 8
+// leituras de 15 min = 2h.
+const TREND_WINDOW = 8;
+// Janela de tempo considerada "histórico recente" pra frequência de
+// ocorrência (Etapa 4).
+const FREQUENCY_WINDOW_HOURS = 30 * 24;
 
 // Avalia os setores conhecidos (SECTOR_MAPPING) em uma única linha de
 // telemetria contra as estatísticas históricas do turno correspondente.
 // Usado tanto para varrer várias linhas (histórico) quanto uma só (snapshot
-// mais recente).
+// mais recente). `recentData`, se informado, habilita o cálculo de
+// tendência (Etapa 5) usando as últimas leituras de cada setor.
 export function detectSectorAnomalies(
   row: ProcessedTelemetryData,
-  sStats: Record<string, Record<TimeBand, SectorStats>>
+  sStats: Record<string, Record<TimeBand, SectorStats>>,
+  recentData?: ProcessedTelemetryData[]
 ): SectorAnomaly[] {
   const band = getBand(row.hour);
   const dateStr = row.timestamp.split(/[T ]/)[0];
   const anomalies: SectorAnomaly[] = [];
+  // Lido uma vez por chamada (não por setor) — custo desprezível, evita 20+
+  // leituras de localStorage na mesma varredura.
+  const recentAlerts = getAlertLogSince(FREQUENCY_WINDOW_HOURS);
+  const marginPct = getAlertMarginPct();
+  const marginMultiplier = 1 + marginPct / 100;
 
   Object.keys(SECTOR_MAPPING).forEach(sec => {
     const actualKey = ALL_SECTORS.find(k => k.includes(sec)) || sec;
     const val = Number(row[actualKey]);
     const s = sStats[actualKey]?.[band];
 
-    if (!s || s.mean === 0) return;
+    if (!s || s.count < MIN_SAMPLES || s.centralValue <= 0) return;
+    if (isNaN(val) || val <= ABS_FLOOR_KWH) return;
 
-    const upperLimit = s.mean + (1.5 * s.stdDev);
+    // Limiar de disparo: padrão esperado (métrica auto-selecionada, Etapa 2)
+    // + margem de erro em % (configurável em Configurações, padrão 20%).
+    // Regra simples de propósito, fácil de explicar: "alerta se o consumo
+    // passar o padrão esperado em X%".
+    const upperLimit = s.centralValue * marginMultiplier;
+    if (val <= upperLimit) return;
 
-    if (val > upperLimit && val > 5) {
-      const deviation = ((val - upperLimit) / upperLimit) * 100;
-      if (deviation > 10) {
-        let severity: SectorAnomaly['severity'] = 'Moderado';
-        if (deviation > 50) severity = 'Crítico';
-        else if (deviation > 20) severity = 'Alto';
+    // % acima do padrão esperado — é o número mostrado nas telas e nas
+    // mensagens de alerta (Etapa 4). Como o disparo já exige ultrapassar a
+    // margem, esse valor é sempre >= marginPct quando a anomalia dispara.
+    const percentualAcimaEsperado = ((val - s.centralValue) / s.centralValue) * 100;
 
-        const mapInfo = SECTOR_MAPPING[sec];
-        let subVal = 0;
-        let subMedian = 1;
-        let actualSubKey = '';
+    let severity: SectorAnomaly['severity'] = 'Moderado';
+    if (percentualAcimaEsperado > 70) severity = 'Crítico';
+    else if (percentualAcimaEsperado > 30) severity = 'Alto';
 
-        if (mapInfo.sub) {
-          actualSubKey = ALL_SECTORS.find(k => k.includes(mapInfo.sub!)) || mapInfo.sub;
-          subVal = Number(row[actualSubKey]) || 0;
-          subMedian = sStats[actualSubKey]?.[band]?.median || 1;
-        }
+    // Validação cruzada (Etapa 2: "sempre que possível, utilizar mais de
+    // uma métrica"): confirma a anomalia também pela média aritmética
+    // "pura" (não a métrica auto-selecionada), usando a mesma margem %.
+    // Não suprime a anomalia quando as métricas discordam — só marca como
+    // não cross-validada, pra não esconder eventos reais atrás de um
+    // segundo critério mais conservador.
+    const classicUpperLimit = s.mean * marginMultiplier;
+    const crossValidated = val > classicUpperLimit;
 
-        anomalies.push({
-          date: dateStr,
-          time: row.time,
-          band,
-          sectorName: mapInfo.label,
-          sectorKey: actualKey,
-          type: mapInfo.type,
-          val,
-          mean: s.mean,
-          expectedMax: upperLimit,
-          deviation,
-          severity,
-          subVal,
-          subMedian,
-          subName: actualSubKey,
-          templateOverride: mapInfo.template,
-        });
-      }
+    const mapInfo = SECTOR_MAPPING[sec];
+    let subVal = 0;
+    let subMedian = 1;
+    let actualSubKey = '';
+    if (mapInfo.sub) {
+      actualSubKey = ALL_SECTORS.find(k => k.includes(mapInfo.sub!)) || mapInfo.sub;
+      subVal = Number(row[actualSubKey]) || 0;
+      subMedian = sStats[actualSubKey]?.[band]?.median || 1;
     }
+
+    const financial = calcFinancialImpact(val, s.centralValue, band);
+
+    let trendSlope = 0;
+    if (recentData && recentData.length > 1) {
+      const series = recentData
+        .slice(-TREND_WINDOW)
+        .map(r => Number(r[actualKey]))
+        .filter(v => !isNaN(v) && v > 0);
+      trendSlope = calcTrendSlope(series);
+    }
+
+    const frequenciaHistorica = recentAlerts.filter(
+      a => a.sectorKey === actualKey && a.band === band
+    ).length;
+
+    anomalies.push({
+      date: dateStr,
+      time: row.time,
+      band,
+      sectorName: mapInfo.label,
+      sectorKey: actualKey,
+      type: mapInfo.type,
+      val,
+      mean: s.mean,
+      expectedMax: upperLimit,
+      deviation: percentualAcimaEsperado,
+      severity,
+      subVal,
+      subMedian,
+      subName: actualSubKey,
+      templateOverride: mapInfo.template,
+      representativeMetric: s.recommendedMetric,
+      centralValue: s.centralValue,
+      crossValidated,
+      excedenteKwh: financial.excedenteKwhIntervalo,
+      custoEstimadoBRL: financial.custoEstimadoIntervalo,
+      projecaoMensalBRL: financial.projecaoMensalBRL,
+      tarifaUsadaBRL: financial.tarifaUsada,
+      frequenciaHistorica,
+      trendSlope,
+    });
   });
 
   return anomalies;

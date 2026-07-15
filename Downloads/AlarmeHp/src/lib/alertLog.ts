@@ -1,4 +1,8 @@
-import { SectorAnomaly } from './anomalyDetection';
+// Import "type-only" de propósito: anomalyDetection.ts agora importa
+// getAlertLogSince (função real) daqui pra calcular frequência histórica
+// (Etapa 4). Um import de tipo é apagado na compilação, então não cria
+// dependência circular em tempo de execução entre os dois módulos.
+import type { SectorAnomaly } from './anomalyDetection';
 
 export interface LoggedAlert extends SectorAnomaly {
   loggedAt: string;

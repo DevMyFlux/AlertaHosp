@@ -37,15 +37,20 @@ export function generateMockData(): RawTelemetryData[] {
          if (hour >= 1 && hour <= 5) usage *= 0.5; // lower hvac at night
       }
 
-      // INJECT ANOMALIES at the end of the simulation (i > 80 is in the last 4 hours)
+      // INJECT ANOMALIES at the end of the simulation (i > 80 is in the last 4 hours).
+      // Os nomes de setor usados aqui antes ('DJ_AC_UTI_NEO', 'ME_CLIM_CHILLER_1',
+      // 'DJ_RM_1') não existem em ALL_SECTORS (src/types.ts) — esse bloco nunca
+      // disparava, então o modo simulado (sem CSV/rede) nunca exercitava a
+      // detecção de anomalias. Corrigido para chaves reais: UTI QG (crítico),
+      // HVAC CME (climatização) e Ressonância (imagem).
       if (i > 80) {
-        if (sector === 'DJ_AC_UTI_NEO' && i === 85) {
+        if (sector === 'ME_UTI_QG_E3' && i === 85) {
           usage += 120; // Massive spike
         }
-        if (sector === 'ME_CLIM_CHILLER_1' && i === 90) {
+        if (sector === 'ME_CLIM_CC_CO_CME' && i === 90) {
           usage += 80; // Big spike
         }
-        if (sector === 'DJ_RM_1' && i === 92) {
+        if (sector === 'DJ60_RM' && i === 92) {
           usage += 150;
         }
       }

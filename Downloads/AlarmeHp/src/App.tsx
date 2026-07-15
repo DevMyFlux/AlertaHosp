@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { generateMockData } from './data/mockData';
 import { processCumulativeData } from './data/processor';
 import { ProcessedTelemetryData } from './types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatStandardAlertMessage } from './lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatConsumoExcedenteParam, formatImpactoMensalParam, formatStandardAlertMessage } from './lib/anomalyDetection';
 import { logAlert } from './lib/alertLog';
 import { ExecutiveView } from './components/ExecutiveView';
 import { HVACView } from './components/HVACView';
@@ -40,7 +40,7 @@ export default function App() {
 
     const last = processedData[processedData.length - 1];
     const sStats = buildSectorBandStats(processedData);
-    const anomalies = detectSectorAnomalies(last, sStats);
+    const anomalies = detectSectorAnomalies(last, sStats, processedData);
 
     const currentSectorKeys = new Set(anomalies.map(a => a.sectorKey));
     // Setores que normalizaram podem alertar de novo na próxima vez que
@@ -67,7 +67,12 @@ export default function App() {
       const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
       const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
       const templateParams = anomaly.templateOverride
-        ? [formatSetorNomeParam(anomaly.sectorName), formatValorComUnidadeParam(anomaly.val)]
+        ? [
+            formatDataHoraParam(anomaly),
+            formatSetorNomeParam(anomaly.sectorName),
+            formatConsumoExcedenteParam(anomaly),
+            formatImpactoMensalParam(anomaly),
+          ]
         : undefined;
 
       try {

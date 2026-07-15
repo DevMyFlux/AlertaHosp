@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { formatSectorParam, formatValorParam, formatSetorNomeParam, formatValorComUnidadeParam, formatStandardAlertMessage, SectorAnomaly } from '../lib/anomalyDetection';
+import { formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatConsumoExcedenteParam, formatImpactoMensalParam, formatStandardAlertMessage, getActionText, SectorAnomaly } from '../lib/anomalyDetection';
 import { getAlertLogSince } from '../lib/alertLog';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send } from 'lucide-react';
 
@@ -23,7 +23,12 @@ export function DiagnosticsView({ data }: Props) {
       const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
       const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
       const templateParams = anomaly.templateOverride
-        ? [formatSetorNomeParam(anomaly.sectorName), formatValorComUnidadeParam(anomaly.val)]
+        ? [
+            formatDataHoraParam(anomaly),
+            formatSetorNomeParam(anomaly.sectorName),
+            formatConsumoExcedenteParam(anomaly),
+            formatImpactoMensalParam(anomaly),
+          ]
         : undefined;
       const response = await fetch('/api/notify', {
         method: 'POST',
@@ -235,10 +240,12 @@ export function DiagnosticsView({ data }: Props) {
                    diagnosticText += ` O sistema de climatização é o principal responsável, correspondendo a ${(mainAlert.subVal / mainAlert.val * 100).toFixed(0)}% da carga.`;
                 }
 
-                let actionText = 'Averiguar maquinário pesado, fornos, estufas ou iluminação não essencial deixados ligados.';
-                if (mainAlert.type === 'Imagem') actionText = 'Checar se os equipamentos de grande porte do setor estão operando simultaneamente ou fora do horário planejado. Verificar possíveis falhas técnicas ou fugas de corrente no Chiller/RM.';
-                else if (mainAlert.type === 'Crítico') actionText = 'Contatar enfermaria/supervisão local para confirmar o uso extraordinário de equipamentos (suporte à vida). Não desarmar sem validação clínica.';
-                else if (isClimaHigh) actionText = 'Verificar limpeza de filtros e setpoint do termostato. Possível congelamento ou sobrecarga do compressor de HVAC local.';
+                // Mesma lógica de causa/ação usada no Monitoramento 15m e nas
+                // mensagens de alerta (src/lib/anomalyDetection.ts) — antes
+                // esse bloco tinha sua própria versão (com "Chiller/RM" e
+                // termos técnicos demais), duplicando e divergindo do texto
+                // real enviado ao destinatário.
+                const actionText = getActionText(mainAlert);
 
                 return (
                   <div key={idx} className="p-5 border border-red-900/30 rounded-lg bg-[#111] relative overflow-hidden mb-6">
