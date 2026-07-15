@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatConsumoExcedenteParam, formatImpactoMensalParam, formatStandardAlertMessage, getActionText, getAlertMarginPct, SectorAnomaly } from '../lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatPercentualParam, formatExcedenteKwhParam, formatCustoEventoParam, formatImpactoMensalValorParam, formatOcorrenciasParam, formatCausaProvavelParam, formatAcaoRecomendadaParam, formatStandardAlertMessage, getActionText, getAlertMarginPct, SectorAnomaly } from '../lib/anomalyDetection';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send, Clock, RefreshCw, Database } from 'lucide-react';
 
 interface Props {
@@ -26,8 +26,13 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
         ? [
             formatDataHoraParam(anomaly),
             formatSetorNomeParam(anomaly.sectorName),
-            formatConsumoExcedenteParam(anomaly),
-            formatImpactoMensalParam(anomaly),
+            formatPercentualParam(anomaly),
+            formatExcedenteKwhParam(anomaly),
+            formatCustoEventoParam(anomaly),
+            formatImpactoMensalValorParam(anomaly),
+            formatOcorrenciasParam(anomaly),
+            formatCausaProvavelParam(anomaly),
+            formatAcaoRecomendadaParam(anomaly),
           ]
         : undefined;
       const response = await fetch('/api/notify', {

@@ -12,48 +12,58 @@ export function getBand(hour: number): TimeBand {
   return 'Demais Horários';
 }
 
-// `template`: nome (sem namespace) de um WhatsApp Message Template
-// aprovado pra esse setor, com 2 parâmetros (setor, valor). Os templates
-// antigos por setor (setor_laboratorio_alerta_energia2 e cia) foram criados
-// na WABA errada dentro da Business Manager "Carbono Zero" (que tem 3 WABAs
-// com o mesmo nome) — por isso rejeitavam sempre ("template ... does not
-// exist"). Foram substituídos por 4 templates novos, um por `type`, criados
-// já na WABA correta (101201763028051, a mesma do "sistema_de_alerta" que
-// funciona). Os nomes originais (alerta_critico_energia e cia, com corpo de
-// 2 variáveis) já existiam na WABA e a Meta não permite recriar um template
-// com o mesmo nome — por isso a versão com o corpo novo (4 variáveis, tom
-// revisado) usa o sufixo _v2: alerta_critico_energia_v2,
-// alerta_imagem_energia_v2, alerta_hvac_energia_v2, alerta_infra_energia_v2.
-// Se o template específico falhar por qualquer motivo (ex: ainda em análise
-// na Meta), o backend cai automaticamente pro "sistema_de_alerta" antes de
-// desistir pro SMS (ver api/app.ts) — então a falta de aprovação de um
-// desses 4 não interrompe o envio, só faz o alerta sair no formato antigo
-// até ser aprovado.
+// Nome (sem namespace) do template único usado por TODOS os setores. Até a
+// rodada anterior existiam 4 templates separados (um por `type`, corpo fixo
+// por tipo). Trocado por um único template com 9 variáveis a pedido do
+// cliente: mais fácil de aprovar na Meta (um cadastro só), reaproveitável
+// pra qualquer setor novo sem precisar de outro template aprovado, e a
+// causa/ação passam a ser parâmetros (entram como texto, não fazem parte do
+// corpo fixo) — o que deixa o template pronto pra uma futura IA de análise
+// simplesmente enviar um texto diferente em {{8}}/{{9}} sem precisar subir
+// um template novo pra cada padrão detectado.
+//
+// IMPORTANTE (lição aprendida cadastrando os templates anteriores): a Meta
+// rejeita (com erro genérico "modelo tem erros") um template que usa a
+// mesma variável {{n}} mais de uma vez no corpo. Cada uma das 9 variáveis
+// abaixo aparece exatamente uma vez no corpo aprovado. Chegou a ter 11
+// variáveis numa versão anterior (impacto anual + economia potencial
+// separados do impacto mensal); simplificado porque as duas só repetiam o
+// mesmo valor sem informação nova.
+export const UNIFIED_TEMPLATE_NAME = 'alerta_consumo_inteligente_v1';
+
+// `template`: nome do WhatsApp Message Template usado pra esse setor — hoje
+// sempre UNIFIED_TEMPLATE_NAME, mas mantido como campo por setor (em vez de
+// uma constante solta no código que chama) pra permitir voltar a diferenciar
+// por setor/tipo no futuro sem mexer em quem consome SECTOR_MAPPING. Se o
+// envio pro template falhar por qualquer motivo (ex: ainda em análise na
+// Meta), o backend cai automaticamente pro "sistema_de_alerta" antes de
+// desistir pro SMS (ver api/app.ts) — então falta de aprovação não interrompe
+// o envio, só faz o alerta sair no formato antigo até ser aprovado.
 export const SECTOR_MAPPING: Record<string, { label: string; sub?: string; type: string; template?: string }> = {
-  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra', template: 'alerta_infra_energia_v2' },
-  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico', template: 'alerta_critico_energia_v2' },
-  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico', template: 'alerta_critico_energia_v2' },
-  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra', template: 'alerta_infra_energia_v2' },
-  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico', template: 'alerta_critico_energia_v2' },
-  'SADT': { label: 'SADT', type: 'Crítico', template: 'alerta_critico_energia_v2' },
-  'ME_UTI_QG_E3': { label: 'UTI QG', sub: 'ME_CLIM_UTI', type: 'Crítico', template: 'alerta_critico_energia_v2' },
-  'ME_UTI_QD_IT': { label: 'UTI QD IT', sub: 'ME_CLIM_UTI', type: 'Crítico', template: 'alerta_critico_energia_v2' },
-  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem', template: 'alerta_imagem_energia_v2' },
-  'DJ60_RM': { label: 'Ressonância', type: 'Imagem', template: 'alerta_imagem_energia_v2' },
-  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem', template: 'alerta_imagem_energia_v2' },
-  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem', template: 'alerta_imagem_energia_v2' },
-  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem', template: 'alerta_imagem_energia_v2' },
+  'DJ1_Lavanderia': { label: 'Lavanderia', sub: 'ME_CLIM_LAVANDERIA', type: 'Infra', template: UNIFIED_TEMPLATE_NAME },
+  'DJ7_Oncologia': { label: 'Oncologia', sub: 'ME_CLIM_ONC_A_T', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
+  'DJ13_Laboratorio': { label: 'Laboratório', sub: 'ME_CLIM_LABORATORIO', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
+  'DJ40_Refeitorio': { label: 'Refeitório', sub: 'ME_CLIM_REF', type: 'Infra', template: UNIFIED_TEMPLATE_NAME },
+  'DJ50_CME': { label: 'CME', sub: 'ME_CLIM_CC_CO_CME', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
+  'SADT': { label: 'SADT', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
+  'ME_UTI_QG_E3': { label: 'UTI QG', sub: 'ME_CLIM_UTI', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
+  'ME_UTI_QD_IT': { label: 'UTI QD IT', sub: 'ME_CLIM_UTI', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
+  'DJ14_Radiologia': { label: 'Radiologia', type: 'Imagem', template: UNIFIED_TEMPLATE_NAME },
+  'DJ60_RM': { label: 'Ressonância', type: 'Imagem', template: UNIFIED_TEMPLATE_NAME },
+  'DJ61_Tomografia': { label: 'Tomografia', type: 'Imagem', template: UNIFIED_TEMPLATE_NAME },
+  'DJ58_RX1': { label: 'Raios-X 1', type: 'Imagem', template: UNIFIED_TEMPLATE_NAME },
+  'DJ59_RX2': { label: 'Raios-X 2', type: 'Imagem', template: UNIFIED_TEMPLATE_NAME },
   // Submetição de climatização promovida a setor próprio de alerta — os
   // dados já vêm na planilha (usados até aqui só como referência cruzada
   // via `sub`), mas nunca foram avaliados como anomalia independente.
-  'ME_CLIM_ONC_A_T': { label: 'HVAC Oncologia', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
-  'ME_CLIM_REF': { label: 'HVAC Refeitório', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
-  'ME_CLIM_LAVANDERIA': { label: 'HVAC Lavanderia', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
-  'ME_CLIM_UTI': { label: 'HVAC UTI', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
-  'ME_CLIM_CC_CO_CME': { label: 'HVAC CME', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
-  'ME_CLIM_EMERGENCIA': { label: 'HVAC Emergência', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
-  'ME_CLIM_AMBULATORIO': { label: 'HVAC Ambulatório', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
-  'ME_CLIM_LABORATORIO': { label: 'HVAC Laboratório', type: 'HVAC', template: 'alerta_hvac_energia_v2' },
+  'ME_CLIM_ONC_A_T': { label: 'HVAC Oncologia', type: 'HVAC', template: UNIFIED_TEMPLATE_NAME },
+  'ME_CLIM_REF': { label: 'HVAC Refeitório', type: 'HVAC', template: UNIFIED_TEMPLATE_NAME },
+  'ME_CLIM_LAVANDERIA': { label: 'HVAC Lavanderia', type: 'HVAC', template: UNIFIED_TEMPLATE_NAME },
+  'ME_CLIM_UTI': { label: 'HVAC UTI', type: 'HVAC', template: UNIFIED_TEMPLATE_NAME },
+  'ME_CLIM_CC_CO_CME': { label: 'HVAC CME', type: 'HVAC', template: UNIFIED_TEMPLATE_NAME },
+  'ME_CLIM_EMERGENCIA': { label: 'HVAC Emergência', type: 'HVAC', template: UNIFIED_TEMPLATE_NAME },
+  'ME_CLIM_AMBULATORIO': { label: 'HVAC Ambulatório', type: 'HVAC', template: UNIFIED_TEMPLATE_NAME },
+  'ME_CLIM_LABORATORIO': { label: 'HVAC Laboratório', type: 'HVAC', template: UNIFIED_TEMPLATE_NAME },
 };
 
 // Estatística por setor/turno — desde a Etapa 2 da refatoração, isso é só um
@@ -243,11 +253,20 @@ export function formatValorComUnidadeParam(val: number, _unidade: string = 'kWh'
   return kwhFormatter.format(val);
 }
 
-// Parâmetros {{1}}..{{4}} dos templates alerta_critico_energia_v2 /
-// alerta_imagem_energia_v2 / alerta_hvac_energia_v2 / alerta_infra_energia_v2: 4
-// variáveis (data/hora com dia da semana, setor, quanto passou do padrão
-// esperado, impacto mensal projetado). Causas e ação ficam fixas no corpo
-// aprovado de cada template (não são variáveis) — ver getCauseProfile.
+// Parâmetros {{1}}..{{9}} do template WhatsApp único (UNIFIED_TEMPLATE_NAME).
+// Cada função aqui embaixo cobre exatamente uma variável, na ordem do corpo
+// aprovado na Meta:
+//   {{1}}  dia da semana + data/hora        {{6}}  impacto financeiro mensal
+//   {{2}}  setor                            {{7}}  ocorrências semelhantes (30 dias)
+//   {{3}}  percentual acima do esperado     {{8}}  causa provável
+//   {{4}}  consumo excedente (kWh)          {{9}}  ação recomendada
+//   {{5}}  custo estimado do evento
+//
+// Existiam também {{7}} "impacto anual" e {{8}} "economia potencial" numa
+// versão anterior de 11 variáveis — removidas por pedido do cliente: ambas
+// só repetiam o valor de "impacto mensal" (uma ×12, a outra reformulada
+// como economia), sem trazer informação nova, e deixavam o template mais
+// longo pra revisar/aprovar na Meta à toa.
 // {{1}} dia da semana + data/hora (ex: "segunda-feira, 14/07 às 05:38")
 export function formatDataHoraParam(anomaly: Pick<SectorAnomaly, 'date' | 'time'>): string {
   const weekday = getWeekdayPt(anomaly.date);
@@ -256,18 +275,54 @@ export function formatDataHoraParam(anomaly: Pick<SectorAnomaly, 'date' | 'time'
   return `${weekday}, ${dataFmt} às ${anomaly.time}`;
 }
 
-// {{3}} quanto passou do padrão esperado, em % e em kWh na mesma frase
-// (ex: "31% acima do padrão (2,1 kWh no intervalo)").
-export function formatConsumoExcedenteParam(anomaly: Pick<SectorAnomaly, 'deviation' | 'excedenteKwh'>): string {
-  return `${pctFormatter.format(anomaly.deviation)}% acima do padrão (${kwhFormatter.format(anomaly.excedenteKwh)} kWh no intervalo)`;
+// {{3}} percentual acima do padrão esperado (ex: "31%").
+export function formatPercentualParam(anomaly: Pick<SectorAnomaly, 'deviation'>): string {
+  return `${pctFormatter.format(anomaly.deviation)}%`;
 }
 
-// {{4}} impacto financeiro projetado por mês, caso o padrão persista todos
-// os dias durante o mesmo turno em que a anomalia foi detectada (ex: "R$
-// 1.240,00/mês (se persistir 8h/dia)").
-export function formatImpactoMensalParam(anomaly: Pick<SectorAnomaly, 'projecaoMensalBRL' | 'band'>): string {
-  const horas = BAND_DURATION_HOURS[anomaly.band] ?? 4;
-  return `${formatBRL(anomaly.projecaoMensalBRL)}/mês (se persistir ${horas}h/dia)`;
+// {{4}} consumo excedente no intervalo, em kWh (ex: "2,1 kWh").
+export function formatExcedenteKwhParam(anomaly: Pick<SectorAnomaly, 'excedenteKwh'>): string {
+  return `${kwhFormatter.format(anomaly.excedenteKwh)} kWh`;
+}
+
+// {{5}} custo estimado apenas deste evento/intervalo (ex: "R$ 3,82").
+export function formatCustoEventoParam(anomaly: Pick<SectorAnomaly, 'custoEstimadoBRL'>): string {
+  return formatBRL(anomaly.custoEstimadoBRL);
+}
+
+// {{6}} impacto financeiro projetado por mês, caso o padrão se repita todo
+// dia durante o mesmo turno em que foi detectado (ex: "R$ 1.240,00").
+export function formatImpactoMensalValorParam(anomaly: Pick<SectorAnomaly, 'projecaoMensalBRL'>): string {
+  return formatBRL(anomaly.projecaoMensalBRL);
+}
+
+// {{7}} quantas vezes esse padrão já ocorreu nos últimos 30 dias (ex: "3
+// vezes nos últimos 30 dias"). Frase pronta pra encaixar em "já ocorreu
+// {{7}}." Vem do histórico local de alertas (src/lib/alertLog.ts,
+// localStorage do navegador) — só conta ocorrências que esse mesmo
+// navegador já detectou e registrou, não o histórico completo da planilha.
+// Zera se o localStorage for limpo ou se o alerta for aberto de outro
+// navegador/dispositivo. Fica preciso quando o envio automático rodar
+// 100% no servidor (item pendente da lista de tarefas).
+export function formatOcorrenciasParam(anomaly: Pick<SectorAnomaly, 'frequenciaHistorica'>): string {
+  const n = anomaly.frequenciaHistorica;
+  if (n <= 0) return 'sem registro de ocorrência semelhante nos últimos 30 dias';
+  return `${n} ${n === 1 ? 'vez' : 'vezes'} nos últimos 30 dias`;
+}
+
+// {{8}} causa provável — frase curta por setor/tipo, ver getCauseProfile.
+export function formatCausaProvavelParam(
+  anomaly: Pick<SectorAnomaly, 'sectorKey' | 'type' | 'subName' | 'subVal' | 'subMedian'>
+): string {
+  return getCauseProfile(anomaly).causaTemplateWA;
+}
+
+// {{9}} ação recomendada — complemento nominal que encaixa em "verificar
+// {{9}}.", ver getCauseProfile.
+export function formatAcaoRecomendadaParam(
+  anomaly: Pick<SectorAnomaly, 'sectorKey' | 'type' | 'subName' | 'subVal' | 'subMedian'>
+): string {
+  return getCauseProfile(anomaly).acaoTemplateWA;
 }
 
 // Mesmo cabeçalho usado no card do Relatório de Diagnóstico da IA. Não usado
@@ -281,16 +336,22 @@ export function formatAlertHeader(sectorName: string): string {
 // Diagnóstico de causa/ação por setor ou tipo, em linguagem técnica mas
 // direta — sem jargão de marca/equipamento (ex: "Chiller"), trocado por
 // termos que qualquer pessoa da equipe entende ("sistema de refrigeração do
-// equipamento"). Reescrito a pedido do cliente, que achou a versão anterior
-// simplista demais numas partes e cheia de termos técnicos demais em
-// outras. `contexto` alimenta a frase "normalmente associado a..."
-// (frequência histórica), `causaProvavel` e `acao` alimentam as frases
-// seguintes — ambas usadas tanto na mensagem completa (SMS/interna) quanto,
-// de forma resumida, no corpo fixo dos templates WhatsApp por tipo.
+// equipamento"). `contexto`/`causaProvavel`/`acao` alimentam a mensagem
+// completa (SMS/interna, formatStandardAlertMessage — frases longas).
+// `causaTemplateWA`/`acaoTemplateWA` alimentam {{8}}/{{9}} do template
+// WhatsApp único (UNIFIED_TEMPLATE_NAME) — frases curtas, sem "Recomenda-se
+// verificar" (isso já está fixo no corpo do template, em "✅ Ação
+// recomendada: verificar {{9}}.").
 interface CauseProfile {
   contexto: string;
   causaProvavel: string;
   acao: string;
+  /** Frase curta pra {{8}} do template WhatsApp (ex: "sistema de
+   *  climatização operando acima da carga térmica habitual"). */
+  causaTemplateWA: string;
+  /** Complemento nominal pra {{9}}, encaixa em "verificar {{9}}." (ex:
+   *  "filtros, compressores, setpoint e funcionamento da climatização"). */
+  acaoTemplateWA: string;
 }
 
 // Perfis específicos por setor — sobrepõem o perfil genérico do `type`
@@ -301,11 +362,15 @@ const SECTOR_SPECIFIC_PROFILES: Record<string, CauseProfile> = {
     contexto: 'uso simultâneo de autoclaves e climatização fora da curva',
     causaProvavel: 'carga térmica elevada ou equipamento de processo operando fora do comportamento habitual',
     acao: 'Recomenda-se verificar a climatização local e os equipamentos de apoio (autoclaves).',
+    causaTemplateWA: 'uso simultâneo de autoclaves e climatização fora do perfil habitual',
+    acaoTemplateWA: 'a climatização local, as autoclaves e os equipamentos de apoio',
   },
   'DJ13_Laboratorio': {
     contexto: 'uso simultâneo de equipamentos de análise e refrigeração',
     causaProvavel: 'equipamentos de análise em operação contínua ou falha em refrigerador/freezer',
     acao: 'Recomenda-se verificar os equipamentos de análise em uso e o funcionamento dos refrigeradores/freezers do setor.',
+    causaTemplateWA: 'equipamentos de análise em operação contínua ou falha em refrigerador/freezer',
+    acaoTemplateWA: 'os equipamentos de análise em uso e os refrigeradores/freezers do setor',
   },
 };
 
@@ -314,21 +379,29 @@ const TYPE_PROFILES: Record<string, CauseProfile> = {
     contexto: 'uso simultâneo de equipamentos de suporte à vida acima do padrão habitual',
     causaProvavel: 'carga elevada de equipamentos essenciais ou pico de demanda simultânea',
     acao: 'Recomenda-se confirmar com a enfermaria ou supervisão do setor o uso extraordinário de equipamentos. Evitar desligamentos sem validação clínica.',
+    causaTemplateWA: 'uso simultâneo de equipamentos de suporte à vida acima do padrão habitual',
+    acaoTemplateWA: 'os equipamentos essenciais em uso junto à enfermaria ou supervisão do setor',
   },
   'Imagem': {
     contexto: 'exames de alta demanda em sequência ou sobrecarga do sistema de refrigeração do equipamento',
     causaProvavel: 'carga térmica do equipamento ou exame de longa duração fora do padrão',
     acao: 'Recomenda-se verificar o sistema de refrigeração do equipamento e a agenda de exames do período.',
+    causaTemplateWA: 'exames de alta demanda em sequência ou sobrecarga térmica dos equipamentos',
+    acaoTemplateWA: 'a agenda de exames, o sistema de refrigeração e os equipamentos de diagnóstico',
   },
   'HVAC': {
     contexto: 'climatização operando fora da curva normal',
     causaProvavel: 'carga térmica elevada ou equipamento de climatização fora do padrão de funcionamento',
     acao: 'Recomenda-se verificar filtros, compressor e o ajuste do termostato do sistema de climatização.',
+    causaTemplateWA: 'sistema de climatização operando acima da carga térmica habitual',
+    acaoTemplateWA: 'os filtros, compressores, setpoint e funcionamento da climatização',
   },
   'Infra': {
     contexto: 'uso de equipamentos ou iluminação fora do horário habitual',
     causaProvavel: 'equipamento ou iluminação em operação fora do horário previsto',
     acao: 'Recomenda-se verificar equipamentos e iluminação do setor.',
+    causaTemplateWA: 'equipamentos ou iluminação operando fora do horário previsto',
+    acaoTemplateWA: 'a iluminação, os equipamentos auxiliares e as cargas não essenciais',
   },
 };
 
@@ -348,6 +421,8 @@ export function getCauseProfile(
       contexto: 'climatização operando fora da curva normal',
       causaProvavel: base.causaProvavel,
       acao: 'Recomenda-se verificar climatização local e equipamentos de apoio.',
+      causaTemplateWA: 'climatização operando fora da curva normal',
+      acaoTemplateWA: 'a climatização local e os equipamentos de apoio',
     };
   }
 

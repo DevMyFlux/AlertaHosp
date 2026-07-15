@@ -68,21 +68,24 @@ export function SettingsView() {
     alert('Configurações salvas com sucesso!');
   };
 
-  // Diagnóstico temporário: dispara um envio real de teste direto pra cada
-  // um dos 4 templates por tipo (valores fictícios, claramente marcados
-  // como TESTE) e mostra a resposta completa da Vonage na tela — inclui
-  // status de aceite síncrono; a rejeição real (se houver) só aparece no
-  // webhook /api/webhooks/vonage-status, ver Logs da Vercel. Remover este
-  // bloco depois que os 4 templates estiverem confirmados entregando.
-  // templateParams segue o formato novo de 4 variáveis (data/hora, setor,
-  // quanto passou do padrão esperado, custo estimado) — ver
-  // src/lib/anomalyDetection.ts (formatDataHoraParam e cia) e os corpos de
-  // template combinados com o cliente.
-  const TEST_TEMPLATES: Record<string, { template: string; params: [string, string, string, string] }> = {
-    'Crítico': { template: 'alerta_critico_energia_v2', params: ['segunda-feira, 14/07 às 05:38', 'UTI QG (TESTE)', '30% acima do padrão (22,4 kWh no intervalo)', 'R$ 1.240,00/mês (se persistir 8h/dia)'] },
-    'Imagem': { template: 'alerta_imagem_energia_v2', params: ['terça-feira, 14/07 às 14:10', 'TOMOGRAFIA (TESTE)', '45% acima do padrão (95,3 kWh no intervalo)', 'R$ 3.100,00/mês (se persistir 6h/dia)'] },
-    'HVAC': { template: 'alerta_hvac_energia_v2', params: ['quarta-feira, 14/07 às 11:00', 'HVAC LAVANDERIA (TESTE)', '25% acima do padrão (3,8 kWh no intervalo)', 'R$ 210,00/mês (se persistir 4h/dia)'] },
-    'Infra': { template: 'alerta_infra_energia_v2', params: ['quinta-feira, 14/07 às 19:20', 'LAVANDERIA (TESTE)', '35% acima do padrão (16,2 kWh no intervalo)', 'R$ 620,00/mês (se persistir 4h/dia)'] },
+  // Diagnóstico temporário: dispara um envio real de teste direto pro
+  // template único (valores fictícios, claramente marcados como TESTE) e
+  // mostra a resposta completa da Vonage na tela — inclui status de aceite
+  // síncrono; a rejeição real (se houver) só aparece no webhook
+  // /api/webhooks/vonage-status, ver Logs da Vercel. Remover este bloco
+  // depois que o template estiver confirmado entregando.
+  // templateParams segue o formato de 9 variáveis (data/hora, setor,
+  // percentual, kWh excedente, custo do evento, impacto mensal, ocorrências,
+  // causa provável, ação recomendada) — ver src/lib/anomalyDetection.ts
+  // (formatDataHoraParam e cia) e o corpo de template combinado com o
+  // cliente. Chegou a ter 11 variáveis (impacto anual + economia potencial
+  // separados), simplificado a pedido do cliente por repetirem o valor do
+  // impacto mensal sem informação nova.
+  const TEST_TEMPLATES: Record<string, { template: string; params: [string, string, string, string, string, string, string, string, string] }> = {
+    'Crítico': { template: 'alerta_consumo_inteligente_v1', params: ['segunda-feira, 14/07 às 05:38', 'UTI QG (TESTE)', '30%', '22,4 kWh', 'R$ 3,82', 'R$ 1.240,00', '3 vezes nos últimos 30 dias', 'uso simultâneo de equipamentos de suporte à vida acima do padrão habitual', 'os equipamentos essenciais em uso junto à enfermaria ou supervisão do setor'] },
+    'Imagem': { template: 'alerta_consumo_inteligente_v1', params: ['terça-feira, 14/07 às 14:10', 'TOMOGRAFIA (TESTE)', '45%', '95,3 kWh', 'R$ 17,20', 'R$ 3.100,00', '2 vezes nos últimos 30 dias', 'exames de alta demanda em sequência ou sobrecarga térmica dos equipamentos', 'a agenda de exames, o sistema de refrigeração e os equipamentos de diagnóstico'] },
+    'HVAC': { template: 'alerta_consumo_inteligente_v1', params: ['quarta-feira, 14/07 às 11:00', 'HVAC LAVANDERIA (TESTE)', '25%', '3,8 kWh', 'R$ 0,68', 'R$ 210,00', 'sem registro de ocorrência semelhante nos últimos 30 dias', 'sistema de climatização operando acima da carga térmica habitual', 'os filtros, compressores, setpoint e funcionamento da climatização'] },
+    'Infra': { template: 'alerta_consumo_inteligente_v1', params: ['quinta-feira, 14/07 às 19:20', 'LAVANDERIA (TESTE)', '35%', '16,2 kWh', 'R$ 2,92', 'R$ 620,00', '5 vezes nos últimos 30 dias', 'equipamentos ou iluminação operando fora do horário previsto', 'a iluminação, os equipamentos auxiliares e as cargas não essenciais'] },
   };
 
   const handleTestTemplate = async (type: string) => {
@@ -301,20 +304,18 @@ export function SettingsView() {
         </button>
       </div>
 
-      {/* Diagnóstico temporário — remover quando os 4 templates novos
-          estiverem confirmados entregando. */}
+      {/* Diagnóstico temporário — remover quando o template único estiver
+          confirmado entregando. */}
       <div className="chart-container border-amber-500/30 bg-amber-950/10">
         <h3 className="text-lg font-medium text-gray-200 mb-2 flex items-center gap-2">
           <FlaskConical className="w-5 h-5 text-amber-400" />
-          Diagnóstico (temporário): templates por tipo
+          Diagnóstico (temporário): template único por tipo de causa/ação
         </h3>
         <p className="text-xs text-gray-500 mb-4">
-          Dispara um envio de teste real (valores fictícios, marcados como TESTE) direto pro template do
-          tipo escolhido (<code className="text-amber-300">alerta_critico_energia_v2</code>,{' '}
-          <code className="text-amber-300">alerta_imagem_energia_v2</code>,{' '}
-          <code className="text-amber-300">alerta_hvac_energia_v2</code> ou{' '}
-          <code className="text-amber-300">alerta_infra_energia_v2</code>) pros números cadastrados acima, e
-          mostra a resposta completa da API. Esse bloco é só pra investigação e será removido depois.
+          Dispara um envio de teste real (valores fictícios, marcados como TESTE) direto pro template{' '}
+          <code className="text-amber-300">alerta_consumo_inteligente_v1</code>, com causa provável e ação
+          recomendada de exemplo pro tipo escolhido, pros números cadastrados acima, e mostra a resposta
+          completa da API. Esse bloco é só pra investigação e será removido depois.
         </p>
         <div className="flex flex-wrap gap-2">
           {Object.keys(TEST_TEMPLATES).map((type) => (

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { generateMockData } from './data/mockData';
 import { processCumulativeData } from './data/processor';
 import { ProcessedTelemetryData } from './types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatConsumoExcedenteParam, formatImpactoMensalParam, formatStandardAlertMessage } from './lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatPercentualParam, formatExcedenteKwhParam, formatCustoEventoParam, formatImpactoMensalValorParam, formatOcorrenciasParam, formatCausaProvavelParam, formatAcaoRecomendadaParam, formatStandardAlertMessage } from './lib/anomalyDetection';
 import { logAlert } from './lib/alertLog';
 import { ExecutiveView } from './components/ExecutiveView';
 import { HVACView } from './components/HVACView';
@@ -70,8 +70,13 @@ export default function App() {
         ? [
             formatDataHoraParam(anomaly),
             formatSetorNomeParam(anomaly.sectorName),
-            formatConsumoExcedenteParam(anomaly),
-            formatImpactoMensalParam(anomaly),
+            formatPercentualParam(anomaly),
+            formatExcedenteKwhParam(anomaly),
+            formatCustoEventoParam(anomaly),
+            formatImpactoMensalValorParam(anomaly),
+            formatOcorrenciasParam(anomaly),
+            formatCausaProvavelParam(anomaly),
+            formatAcaoRecomendadaParam(anomaly),
           ]
         : undefined;
 
