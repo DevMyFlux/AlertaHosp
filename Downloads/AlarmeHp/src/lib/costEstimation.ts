@@ -22,12 +22,17 @@ export function getTariffBRLPerKWh(): number {
     const parsedStorage = fromStorage ? Number(String(fromStorage).replace(',', '.')) : NaN;
     if (!isNaN(parsedStorage) && parsedStorage > 0) return parsedStorage;
   } catch {
-    // localStorage indisponível (ex: execução fora do browser) — ignora e cai pro próximo nível
+    // localStorage indisponível (ex: execução no cron server-side, fora do browser) — ignora e cai pro próximo nível
   }
 
-  const fromEnv = (import.meta as any)?.env?.VITE_TARIFF_BRL_PER_KWH;
-  const parsedEnv = fromEnv ? Number(String(fromEnv).replace(',', '.')) : NaN;
-  return !isNaN(parsedEnv) && parsedEnv > 0 ? parsedEnv : DEFAULT_TARIFF_BRL_PER_KWH;
+  const fromViteEnv = (import.meta as any)?.env?.VITE_TARIFF_BRL_PER_KWH;
+  const parsedViteEnv = fromViteEnv ? Number(String(fromViteEnv).replace(',', '.')) : NaN;
+  if (!isNaN(parsedViteEnv) && parsedViteEnv > 0) return parsedViteEnv;
+
+  // Fallback pro cron server-side (sem import.meta.env do Vite nesse contexto).
+  const fromProcessEnv = typeof process !== 'undefined' && process.env ? process.env.TARIFF_BRL_PER_KWH : undefined;
+  const parsedProcessEnv = fromProcessEnv ? Number(String(fromProcessEnv).replace(',', '.')) : NaN;
+  return !isNaN(parsedProcessEnv) && parsedProcessEnv > 0 ? parsedProcessEnv : DEFAULT_TARIFF_BRL_PER_KWH;
 }
 
 // Duração (em horas) de cada turno usado em anomalyDetection.ts — usada pra

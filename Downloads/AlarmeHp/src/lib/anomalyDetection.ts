@@ -1,7 +1,7 @@
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
 import { analyzeDistribution, DistributionStats, calcTrendSlope, RepresentativeMetric } from './statistics';
 import { calcFinancialImpact, formatBRL, BAND_DURATION_HOURS } from './costEstimation';
-import { getAlertLogSince } from './alertLog';
+import { getAlertLogSince, LoggedAlert } from './alertLog';
 
 export type TimeBand = 'Café da Manhã (07-10h)' | 'Almoço (10-14h)' | 'Jantar (18-22h)' | 'Demais Horários';
 
@@ -150,8 +150,12 @@ export function getAlertMarginPct(): number {
     const parsed = saved ? Number(String(saved).replace(',', '.')) : NaN;
     if (!isNaN(parsed) && parsed > 0) return parsed;
   } catch {
-    // localStorage indisponível — cai pro padrão
+    // localStorage indisponível (ex: execução no cron server-side, fora do
+    // navegador) — cai pra env var, depois pro padrão.
   }
+  const fromEnv = typeof process !== 'undefined' && process.env ? process.env.ALERT_MARGIN_PCT : undefined;
+  const parsedEnv = fromEnv ? Number(String(fromEnv).replace(',', '.')) : NaN;
+  if (!isNaN(parsedEnv) && parsedEnv > 0) return parsedEnv;
   return DEFAULT_ALERT_MARGIN_PCT;
 }
 
@@ -508,14 +512,19 @@ const FREQUENCY_WINDOW_HOURS = 30 * 24;
 export function detectSectorAnomalies(
   row: ProcessedTelemetryData,
   sStats: Record<string, Record<TimeBand, SectorStats>>,
-  recentData?: ProcessedTelemetryData[]
+  recentData?: ProcessedTelemetryData[],
+  // Permite injetar o histórico de alertas já carregado (ex: pelo cron
+  // server-side, que busca do Redis de forma assíncrona antes de chamar
+  // esta função síncrona) em vez de ler de getAlertLogSince/localStorage —
+  // que no servidor não existe e sempre voltaria vazio.
+  recentAlertsOverride?: LoggedAlert[]
 ): SectorAnomaly[] {
   const band = getBand(row.hour);
   const dateStr = row.timestamp.split(/[T ]/)[0];
   const anomalies: SectorAnomaly[] = [];
   // Lido uma vez por chamada (não por setor) — custo desprezível, evita 20+
   // leituras de localStorage na mesma varredura.
-  const recentAlerts = getAlertLogSince(FREQUENCY_WINDOW_HOURS);
+  const recentAlerts = recentAlertsOverride ?? getAlertLogSince(FREQUENCY_WINDOW_HOURS);
   const marginPct = getAlertMarginPct();
   const marginMultiplier = 1 + marginPct / 100;
 

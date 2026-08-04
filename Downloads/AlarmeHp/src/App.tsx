@@ -4,6 +4,7 @@ import { processCumulativeData } from './data/processor';
 import { ProcessedTelemetryData } from './types';
 import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatPercentualParam, formatExcedenteKwhParam, formatCustoEventoParam, formatImpactoMensalValorParam, formatOcorrenciasParam, formatCausaProvavelParam, formatAcaoRecomendadaParam, formatStandardAlertMessage } from './lib/anomalyDetection';
 import { logAlert } from './lib/alertLog';
+import { SHEET_URL } from './config/sheet';
 import { ExecutiveView } from './components/ExecutiveView';
 import { HVACView } from './components/HVACView';
 import { ImagingView } from './components/ImagingView';
@@ -27,8 +28,6 @@ export default function App() {
   const [autoCheckEnabled, setAutoCheckEnabled] = useState(
     localStorage.getItem('auto_check_enabled') !== 'false'
   );
-
-  const SHEET_URL = "https://docs.google.com/spreadsheets/d/15BmawHMQ6ucZJwe5jqksRw2ZSW55R4IszgnmbTTYWGs/export?format=csv&gid=681869284";
 
   // Setores que já dispararam alerta e ainda não voltaram ao normal — evita
   // reenviar WhatsApp a cada ciclo de 15 min enquanto a mesma anomalia
