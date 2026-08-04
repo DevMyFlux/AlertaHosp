@@ -2,8 +2,7 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import Papa from "papaparse";
 import { sendAlertNotification } from "./lib/notify.js";
-import { kvConfigured } from "./lib/kv.js";
-import { getActiveSectors, setActiveSectors, getRecentAlerts, recordAlert } from "./lib/serverAlertStore.js";
+import { alertStoreConfigured, getActiveSectors, setActiveSectors, getRecentAlerts, recordAlert } from "./lib/serverAlertStore.js";
 import { SHEET_URL } from "../src/config/sheet.js";
 import { processCumulativeData } from "../src/data/processor.js";
 import {
@@ -66,9 +65,9 @@ app.all("/api/cron-check", async (req, res) => {
     return;
   }
 
-  if (!kvConfigured) {
+  if (!alertStoreConfigured) {
     res.status(500).json({
-      error: 'Redis (KV_REST_API_URL/KV_REST_API_TOKEN ou UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN) não configurado — necessário para o cron não reenviar o mesmo alerta a cada execução.'
+      error: 'Google Service Account (GOOGLE_SERVICE_ACCOUNT_EMAIL/GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) não configurada — necessário para o cron não reenviar o mesmo alerta a cada execução.'
     });
     return;
   }

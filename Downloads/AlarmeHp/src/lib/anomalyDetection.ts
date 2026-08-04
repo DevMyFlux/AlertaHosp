@@ -514,10 +514,12 @@ export function detectSectorAnomalies(
   sStats: Record<string, Record<TimeBand, SectorStats>>,
   recentData?: ProcessedTelemetryData[],
   // Permite injetar o histórico de alertas já carregado (ex: pelo cron
-  // server-side, que busca do Redis de forma assíncrona antes de chamar
+  // server-side, que busca da planilha de forma assíncrona antes de chamar
   // esta função síncrona) em vez de ler de getAlertLogSince/localStorage —
-  // que no servidor não existe e sempre voltaria vazio.
-  recentAlertsOverride?: LoggedAlert[]
+  // que no servidor não existe e sempre voltaria vazio. Só sectorKey/band
+  // são de fato lidos abaixo, por isso o tipo reduzido (Pick) — permite que
+  // o cron injete objetos sem precisar reconstruir um LoggedAlert completo.
+  recentAlertsOverride?: Pick<LoggedAlert, 'sectorKey' | 'band'>[]
 ): SectorAnomaly[] {
   const band = getBand(row.hour);
   const dateStr = row.timestamp.split(/[T ]/)[0];
