@@ -67,7 +67,7 @@ app.all("/api/cron-check", async (req, res) => {
 
   if (!alertStoreConfigured) {
     res.status(500).json({
-      error: 'Google Service Account (GOOGLE_SERVICE_ACCOUNT_EMAIL/GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) não configurada — necessário para o cron não reenviar o mesmo alerta a cada execução.'
+      error: 'SHEETS_WEBAPP_URL/CRON_SECRET não configurados — necessário para o cron não reenviar o mesmo alerta a cada execução. Ver apps-script/README.md.'
     });
     return;
   }
