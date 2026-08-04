@@ -2,7 +2,7 @@
 // getAlertLogSince (função real) daqui pra calcular frequência histórica
 // (Etapa 4). Um import de tipo é apagado na compilação, então não cria
 // dependência circular em tempo de execução entre os dois módulos.
-import type { SectorAnomaly } from './anomalyDetection';
+import type { SectorAnomaly } from './anomalyDetection.js';
 
 export interface LoggedAlert extends SectorAnomaly {
   loggedAt: string;

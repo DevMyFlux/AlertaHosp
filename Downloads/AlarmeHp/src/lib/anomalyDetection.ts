@@ -1,7 +1,7 @@
-import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
-import { analyzeDistribution, DistributionStats, calcTrendSlope, RepresentativeMetric } from './statistics';
-import { calcFinancialImpact, formatBRL, BAND_DURATION_HOURS } from './costEstimation';
-import { getAlertLogSince, LoggedAlert } from './alertLog';
+import { ProcessedTelemetryData, ALL_SECTORS } from '../types.js';
+import { analyzeDistribution, DistributionStats, calcTrendSlope, RepresentativeMetric } from './statistics.js';
+import { calcFinancialImpact, formatBRL, BAND_DURATION_HOURS } from './costEstimation.js';
+import { getAlertLogSince, LoggedAlert } from './alertLog.js';
 
 export type TimeBand = 'Café da Manhã (07-10h)' | 'Almoço (10-14h)' | 'Jantar (18-22h)' | 'Demais Horários';
 

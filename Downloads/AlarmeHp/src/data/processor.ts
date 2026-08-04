@@ -1,4 +1,4 @@
-import { RawTelemetryData, ProcessedTelemetryData, ALL_SECTORS } from '../types';
+import { RawTelemetryData, ProcessedTelemetryData, ALL_SECTORS } from '../types.js';
 import { parseISO, format, getHours } from 'date-fns';
 
 function getPeriod(hour: number): 'Madrugada' | 'Manhã' | 'Tarde' | 'Noite' {
