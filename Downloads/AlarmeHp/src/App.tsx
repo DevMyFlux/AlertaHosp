@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { generateMockData } from './data/mockData';
 import { processCumulativeData } from './data/processor';
 import { ProcessedTelemetryData } from './types';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatPercentualParam, formatExcedenteKwhParam, formatCustoEventoParam, formatImpactoMensalValorParam, formatOcorrenciasParam, formatCausaProvavelParam, formatAcaoRecomendadaParam, formatStandardAlertMessage } from './lib/anomalyDetection';
-import { logAlert } from './lib/alertLog';
 import { SHEET_URL } from './config/sheet';
 import { ExecutiveView } from './components/ExecutiveView';
 import { HVACView } from './components/HVACView';
@@ -29,78 +27,6 @@ export default function App() {
     localStorage.getItem('auto_check_enabled') !== 'false'
   );
 
-  // Setores que já dispararam alerta e ainda não voltaram ao normal — evita
-  // reenviar WhatsApp a cada ciclo de 15 min enquanto a mesma anomalia
-  // persiste (spam pro destinatário e risco de limite/qualidade na Meta).
-  const alertedSectorsRef = useRef<Set<string>>(new Set());
-
-  const checkAnomaliesAndAlert = async (processedData: ProcessedTelemetryData[]) => {
-    if (processedData.length === 0) return;
-
-    const last = processedData[processedData.length - 1];
-    const sStats = buildSectorBandStats(processedData);
-    const anomalies = detectSectorAnomalies(last, sStats, processedData);
-
-    const currentSectorKeys = new Set(anomalies.map(a => a.sectorKey));
-    // Setores que normalizaram podem alertar de novo na próxima vez que
-    // ficarem anômalos.
-    for (const key of Array.from(alertedSectorsRef.current)) {
-      if (!currentSectorKeys.has(key)) {
-        alertedSectorsRef.current.delete(key);
-      }
-    }
-
-    const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
-    const appId = localStorage.getItem('vonage_app_id') || '';
-    const privateKey = localStorage.getItem('vonage_private_key') || '';
-    const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
-
-    for (const anomaly of anomalies) {
-      if (alertedSectorsRef.current.has(anomaly.sectorKey)) continue;
-      alertedSectorsRef.current.add(anomaly.sectorKey);
-      logAlert(anomaly);
-
-      console.log(`Anomalia detectada em ${anomaly.sectorName}! Enviando alerta automático...`);
-
-      const message = formatStandardAlertMessage(anomaly);
-      const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
-      const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
-      const templateParams = anomaly.templateOverride
-        ? [
-            formatDataHoraParam(anomaly),
-            formatSetorNomeParam(anomaly.sectorName),
-            formatPercentualParam(anomaly),
-            formatExcedenteKwhParam(anomaly),
-            formatCustoEventoParam(anomaly),
-            formatImpactoMensalValorParam(anomaly),
-            formatOcorrenciasParam(anomaly),
-            formatCausaProvavelParam(anomaly),
-            formatAcaoRecomendadaParam(anomaly),
-          ]
-        : undefined;
-
-      try {
-        const notifyResponse = await fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom,
-            templateOverride: anomaly.templateOverride, templateParams
-          })
-        });
-        const notifyData = await notifyResponse.json();
-        const smsFallback = (notifyData.results || []).find((r: any) => r.channel === 'sms' && r.whatsappError);
-        if (smsFallback) {
-          console.warn("WhatsApp falhou, notificação caiu para SMS:", smsFallback.whatsappError);
-        }
-      } catch (error) {
-        console.error(`Erro ao notificar automaticamente sobre ${anomaly.sectorName}:`, error);
-        // Falhou o envio: libera pra tentar de novo no próximo ciclo.
-        alertedSectorsRef.current.delete(anomaly.sectorKey);
-      }
-    }
-  };
-
   const fetchData = () => {
     fetch(SHEET_URL)
       .then(response => {
@@ -119,7 +45,6 @@ export default function App() {
                 setData(processed);
                 setIsSimulated(false);
                 setLastUpdate(new Date());
-                checkAnomaliesAndAlert(processed);
               } else {
                 throw new Error("No data found");
               }
@@ -130,7 +55,6 @@ export default function App() {
               setData(processedMock);
               setIsSimulated(true);
               setLastUpdate(new Date());
-              checkAnomaliesAndAlert(processedMock);
             }
           }
         });
@@ -142,7 +66,6 @@ export default function App() {
         setData(processedMock);
         setIsSimulated(true);
         setLastUpdate(new Date());
-        checkAnomaliesAndAlert(processedMock);
       });
   };
 
