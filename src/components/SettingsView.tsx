@@ -279,6 +279,30 @@ export function SettingsView({ hiddenTabs = [], toggleTabVisibility, theme = 'da
         </div>
       </div>
 
+      <div className="chart-container border-red-500/20">
+        <h3 className="text-lg font-medium text-gray-200 mb-4 flex items-center gap-2">
+          <FileText className="w-5 h-5 text-red-400" />
+          Dados Locais
+        </h3>
+        
+        <p className="text-xs text-gray-500 mb-4">
+          O sistema mantém um cache local no seu navegador com o histórico dos alertas. Se você estiver vendo dados fantasmas ou testes antigos, pode limpar este cache.
+        </p>
+
+        <button
+          onClick={() => {
+            if (window.confirm('Tem certeza que deseja apagar o histórico de alertas do seu navegador?')) {
+              localStorage.removeItem('alert_log');
+              alert('Cache local limpo com sucesso! A tela de histórico não mostrará mais esses dados (a menos que ainda existam na sua Planilha Google, se configurada).');
+              window.location.reload();
+            }
+          }}
+          className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 rounded text-sm hover:bg-red-500/20 transition-colors"
+        >
+          Limpar Cache Local de Alertas
+        </button>
+      </div>
+
       <div className="chart-container border-purple-500/20">
         <h3 className="text-lg font-medium text-gray-200 mb-4 flex items-center gap-2">
           <Eye className="w-5 h-5 text-purple-400" />

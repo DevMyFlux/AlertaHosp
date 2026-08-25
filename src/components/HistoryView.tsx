@@ -157,7 +157,9 @@ export function HistoryView({ data }: Props) {
     return Object.entries(summary).map(([sector, data]) => ({
       sector,
       ...data
-    })).sort((a, b) => b.custo - a.custo);
+    }))
+    .filter(s => s.excedente > 0 || s.custo > 0)
+    .sort((a, b) => b.custo - a.custo);
   }, [filteredLogs]);
 
   const handleExportXLSX = () => {
