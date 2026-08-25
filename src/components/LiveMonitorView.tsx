@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
+import { logAlert } from '../lib/alertLog';
 import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatPercentualParam, formatExcedenteKwhParam, formatCustoEventoParam, formatImpactoMensalValorParam, formatOcorrenciasParam, formatCausaProvavelParam, formatAcaoRecomendadaParam, formatStandardAlertMessage, getActionText, getAlertMarginPct, SectorAnomaly } from '../lib/anomalyDetection';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send, Clock, RefreshCw, Database } from 'lucide-react';
 
@@ -50,6 +51,9 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
       } else {
         alert("Notificação enviada com sucesso!");
       }
+      
+      // Log the alert to local history view
+      logAlert(anomaly);
     } catch (e: any) {
       console.warn("Notification error:", e);
       alert(`Erro ao enviar notificação: ${e?.message || e}`);
@@ -73,6 +77,13 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
 
     return { lastRecord: last, alerts, totalPlant: total };
   }, [data]);
+
+  // Registra automaticamente as anomalias ativas no histórico local
+  React.useEffect(() => {
+    if (alerts && alerts.length > 0) {
+      alerts.forEach(alert => logAlert(alert));
+    }
+  }, [alerts]);
 
   const formatKw = (val: number) => Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(val);
 

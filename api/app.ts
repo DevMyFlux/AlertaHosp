@@ -155,6 +155,21 @@ app.all("/api/cron-check", async (req, res) => {
   }
 });
 
+app.get("/api/alert-history", async (req, res) => {
+  try {
+    if (!alertStoreConfigured) {
+      res.json({ rows: [] });
+      return;
+    }
+    const { getRows } = await import("./lib/sheetsBridge.js");
+    const rows = await getRows();
+    res.json({ rows });
+  } catch (error: any) {
+    console.warn("Aviso: Falha ao carregar histórico remoto (Apps Script desconfigurado?). Retornando lista vazia.");
+    res.json({ rows: [] });
+  }
+});
+
 // A API de Mensagens da Vonage aceita o envio de forma síncrona (fila pra
 // entrega) e só informa o resultado real (entregue/rejeitado pela Meta) de
 // forma assíncrona, via webhook. Sem esses endpoints configurados na
