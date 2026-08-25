@@ -17,7 +17,9 @@ export function HistoryView({ data }: Props) {
   const [viewMode, setViewMode] = useState<'resumo' | 'detalhado'>('resumo');
   
   const [sectorFilter, setSectorFilter] = useState<string>('ALL');
-  const [daysFilter, setDaysFilter] = useState<number>(30); // in days
+  const [daysFilter, setDaysFilter] = useState<number | 'custom'>(30);
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
 
   useEffect(() => {
     // Fetch real backend history from Google Sheets
@@ -120,17 +122,33 @@ export function HistoryView({ data }: Props) {
   }, [localLogs, remoteLogs]);
 
   const filteredLogs = useMemo(() => {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysFilter);
+    let cutoffDate = new Date(0);
+    let endDate = new Date('9999-12-31');
+
+    if (daysFilter === 'custom') {
+      if (customStartDate) {
+        cutoffDate = new Date(customStartDate);
+        // Force the cutoff to the start of the day in local time
+        cutoffDate = new Date(cutoffDate.getTime() + cutoffDate.getTimezoneOffset() * 60000);
+        cutoffDate.setHours(0, 0, 0, 0);
+      }
+      if (customEndDate) {
+        endDate = new Date(customEndDate);
+        endDate = new Date(endDate.getTime() + endDate.getTimezoneOffset() * 60000);
+        endDate.setHours(23, 59, 59, 999);
+      }
+    } else {
+      cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysFilter);
+    }
 
     return allLogs.filter(log => {
       if (sectorFilter !== 'ALL' && log.sectorName !== sectorFilter) return false;
       const logDate = new Date(log.loggedAt);
-      if (logDate < cutoffDate) return false;
-      if (log.excedenteKwh <= 0 && log.custoEstimadoBRL <= 0) return false;
+      if (logDate < cutoffDate || logDate > endDate) return false;
       return true;
     }).sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime());
-  }, [allLogs, sectorFilter, daysFilter]);
+  }, [allLogs, sectorFilter, daysFilter, customStartDate, customEndDate]);
 
   const uniqueSectors = useMemo(() => {
     return Array.from(new Set(allLogs.map(l => l.sectorName))).sort();
@@ -228,14 +246,37 @@ export function HistoryView({ data }: Props) {
             <select
               className="bg-transparent text-sm text-gray-200 outline-none border-none"
               value={daysFilter}
-              onChange={e => setDaysFilter(Number(e.target.value))}
+              onChange={e => {
+                const val = e.target.value;
+                setDaysFilter(val === 'custom' ? 'custom' : Number(val));
+              }}
             >
               <option value={7}>Últimos 7 dias</option>
               <option value={15}>Últimos 15 dias</option>
               <option value={30}>Últimos 30 dias</option>
               <option value={90}>Últimos 90 dias</option>
+              <option value="custom">Período Específico</option>
             </select>
           </div>
+          {daysFilter === 'custom' && (
+            <div className="flex items-center gap-2 bg-[#1A1A1A] border border-[#333] px-3 py-1.5 rounded-md">
+              <input
+                type="date"
+                className="bg-transparent text-sm text-gray-200 outline-none border-none"
+                value={customStartDate}
+                onChange={e => setCustomStartDate(e.target.value)}
+                title="Data inicial"
+              />
+              <span className="text-gray-500 text-xs">até</span>
+              <input
+                type="date"
+                className="bg-transparent text-sm text-gray-200 outline-none border-none"
+                value={customEndDate}
+                onChange={e => setCustomEndDate(e.target.value)}
+                title="Data final"
+              />
+            </div>
+          )}
           <button
             onClick={handleExportXLSX}
             className="flex items-center gap-2 px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-md border border-green-500/30 transition-colors text-sm font-medium"
