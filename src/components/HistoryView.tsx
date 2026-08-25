@@ -127,6 +127,7 @@ export function HistoryView({ data }: Props) {
       if (sectorFilter !== 'ALL' && log.sectorName !== sectorFilter) return false;
       const logDate = new Date(log.loggedAt);
       if (logDate < cutoffDate) return false;
+      if (log.excedenteKwh <= 0 && log.custoEstimadoBRL <= 0) return false;
       return true;
     }).sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime());
   }, [allLogs, sectorFilter, daysFilter]);
@@ -158,7 +159,6 @@ export function HistoryView({ data }: Props) {
       sector,
       ...data
     }))
-    .filter(s => s.excedente > 0 || s.custo > 0)
     .sort((a, b) => b.custo - a.custo);
   }, [filteredLogs]);
 
