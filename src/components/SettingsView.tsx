@@ -322,7 +322,6 @@ export function SettingsView({ hiddenTabs = [], toggleTabVisibility, theme = 'da
             { id: 'hvac', label: 'Operação e HVAC' },
             { id: 'imaging', label: 'Diag. Imagem' },
             { id: 'diagnostics', label: 'AI Diagnostics' },
-            { id: 'chat', label: 'AI Assistant' },
           ].map((tab) => {
             const isHidden = hiddenTabs.includes(tab.id);
             return (

@@ -8,7 +8,10 @@ import { HVACView } from './components/HVACView';
 import { ImagingView } from './components/ImagingView';
 import { DiagnosticsView } from './components/DiagnosticsView';
 import { SectorView } from './components/SectorView';
-import { AiChatView } from './components/AiChatView';
+// AI Chat temporariamente removida do menu: GEMINI_API_KEY ainda não
+// confirmada na Vercel (não afeta o envio de alertas). Componente e rota
+// /api/chat continuam no código, só tiramos da navegação.
+// import { AiChatView } from './components/AiChatView';
 import { LiveMonitorView } from './components/LiveMonitorView';
 import { SettingsView } from './components/SettingsView';
 import { HistoryView } from './components/HistoryView';
@@ -17,7 +20,7 @@ import { Activity, Wind, Radio, Database, UploadCloud, Bot, BarChart2, Clock, Se
 import clsx from 'clsx';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'executive' | 'hvac' | 'imaging' | 'diagnostics' | 'sector' | 'live' | 'settings' | 'chat' | 'history'>('executive');
+  const [activeTab, setActiveTab] = useState<'executive' | 'hvac' | 'imaging' | 'diagnostics' | 'sector' | 'live' | 'settings' | 'history'>('executive');
   const [data, setData] = useState<ProcessedTelemetryData[]>([]);
   const [isSimulated, setIsSimulated] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -165,7 +168,6 @@ export default function App() {
             {!hiddenTabs.includes('hvac') && <TabButton active={activeTab === 'hvac'} onClick={() => setActiveTab('hvac')} icon={<Wind className="w-4 h-4" />}>Operação e HVAC</TabButton>}
             {!hiddenTabs.includes('imaging') && <TabButton active={activeTab === 'imaging'} onClick={() => setActiveTab('imaging')} icon={<Radio className="w-4 h-4" />}>Diag. Imagem</TabButton>}
             {!hiddenTabs.includes('diagnostics') && <TabButton active={activeTab === 'diagnostics'} onClick={() => setActiveTab('diagnostics')} icon={<Bot className="w-4 h-4" />}>AI Diagnostics</TabButton>}
-            {!hiddenTabs.includes('chat') && <TabButton active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<Bot className="w-4 h-4" />}>AI Assistant</TabButton>}
             <TabButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings className="w-4 h-4" />}>Configurações</TabButton>
           </div>
         </div>
@@ -196,7 +198,6 @@ export default function App() {
           {activeTab === 'hvac' && <HVACView data={data} />}
           {activeTab === 'imaging' && <ImagingView data={data} />}
           {activeTab === 'diagnostics' && <DiagnosticsView data={data} />}
-          {activeTab === 'chat' && <AiChatView data={data} />}
           {activeTab === 'history' && <HistoryView data={data} />}
           {activeTab === 'settings' && <SettingsView hiddenTabs={hiddenTabs} toggleTabVisibility={toggleTabVisibility} theme={theme} setTheme={setTheme} />}
       </main>

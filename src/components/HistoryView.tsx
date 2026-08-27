@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getAlertLog, LoggedAlert } from '../lib/alertLog';
-import { Download, Filter, Search, AlertCircle, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Filter, Search, AlertCircle, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { formatBRL, calcFinancialImpact } from '../lib/costEstimation';
 import * as XLSX from 'xlsx';
 import { ProcessedTelemetryData } from '../types';
-import { buildSectorBandStats, getAlertMarginPct } from '../lib/anomalyDetection';
+import { buildSectorBandStats, getAlertMarginPct, SECTOR_MAPPING } from '../lib/anomalyDetection';
 
 interface Props {
   data: ProcessedTelemetryData[];
@@ -54,10 +54,19 @@ export function HistoryView({ data }: Props) {
 
           let val = 0;
           let expectedMax = 0;
-          let excedenteKwh = 0;
-          let custoEstimadoBRL = 0;
           let projecaoMensalBRL = 0;
-          let sectorName = r.sectorKey.replace(/_Quality|ME_CLIM_|DJ\d+_/, '').replace(/_/g, ' ');
+          // Alguns setores HVAC têm um "." indevido prefixado no nome da coluna
+          // real da planilha (bug pré-existente em src/types.ts, fora do escopo
+          // desta mudança) — normaliza antes do lookup pra não cair no fallback.
+          const sectorName = SECTOR_MAPPING[r.sectorKey.replace(/^\./, '')]?.label || r.sectorKey;
+
+          // Excedente/custo já vêm exatos do histórico persistido (gravados no
+          // momento real do alerta, junto com a mensagem enviada) — não
+          // recalcular. Só a telemetria bruta é usada aqui, e só pra contexto
+          // informativo (consumo/padrão do instante mais próximo), já que esses
+          // dois campos não são persistidos e por isso continuam aproximados.
+          const excedenteKwh = Number(r.excedenteKwh) || 0;
+          const custoEstimadoBRL = Number(r.custoGeradoBRL) || 0;
 
           if (closestPoint) {
             val = Number(closestPoint[r.sectorKey]) || 0;
@@ -65,10 +74,7 @@ export function HistoryView({ data }: Props) {
             if (stat) {
                expectedMax = stat.mean * (1 + marginPct / 100);
                if (val > expectedMax) {
-                 const impact = calcFinancialImpact(val, expectedMax, r.band);
-                 excedenteKwh = impact.excedenteKwhIntervalo;
-                 custoEstimadoBRL = impact.custoEstimadoIntervalo;
-                 projecaoMensalBRL = impact.projecaoMensalBRL;
+                 projecaoMensalBRL = calcFinancialImpact(val, expectedMax, r.band).projecaoMensalBRL;
                }
             }
           }
@@ -144,11 +150,21 @@ export function HistoryView({ data }: Props) {
 
     return allLogs.filter(log => {
       if (sectorFilter !== 'ALL' && log.sectorName !== sectorFilter) return false;
+      if (log.excedenteKwh <= 0 && log.custoEstimadoBRL <= 0) return false;
       const logDate = new Date(log.loggedAt);
       if (logDate < cutoffDate || logDate > endDate) return false;
       return true;
     }).sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime());
   }, [allLogs, sectorFilter, daysFilter, customStartDate, customEndDate]);
+
+  // Range customizado com data final antes da inicial não tem resultado
+  // possível — sinaliza isso explicitamente em vez de cair na mensagem
+  // genérica de "nenhum dado", que confundiria causa (filtro inválido) com
+  // efeito (sem dados no período).
+  const dateRangeError = useMemo(() => {
+    if (daysFilter !== 'custom' || !customStartDate || !customEndDate) return null;
+    return customEndDate < customStartDate ? 'A data final não pode ser anterior à data inicial.' : null;
+  }, [daysFilter, customStartDate, customEndDate]);
 
   const uniqueSectors = useMemo(() => {
     return Array.from(new Set(allLogs.map(l => l.sectorName))).sort();
@@ -339,7 +355,19 @@ export function HistoryView({ data }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#333]">
-                {summaryBySector.length === 0 ? (
+                {dateRangeError ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-red-400">
+                      {dateRangeError}
+                    </td>
+                  </tr>
+                ) : loadingRemote && summaryBySector.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                      <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Sincronizando alertas do servidor...</span>
+                    </td>
+                  </tr>
+                ) : summaryBySector.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
                       Nenhum dado para o período.
@@ -378,7 +406,13 @@ export function HistoryView({ data }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#333]">
-              {loadingRemote && filteredLogs.length === 0 ? (
+              {dateRangeError ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-red-400">
+                    {dateRangeError}
+                  </td>
+                </tr>
+              ) : loadingRemote && filteredLogs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500 flex justify-center items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> Sincronizando alertas do servidor...
