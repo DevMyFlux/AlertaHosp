@@ -8,24 +8,44 @@ import { HVACView } from './components/HVACView';
 import { ImagingView } from './components/ImagingView';
 import { DiagnosticsView } from './components/DiagnosticsView';
 import { SectorView } from './components/SectorView';
-// AI Chat temporariamente removida do menu: GEMINI_API_KEY ainda não
-// confirmada na Vercel (não afeta o envio de alertas). Componente e rota
-// /api/chat continuam no código, só tiramos da navegação.
-// import { AiChatView } from './components/AiChatView';
+import { AiChatView } from './components/AiChatView';
 import { LiveMonitorView } from './components/LiveMonitorView';
 import { SettingsView } from './components/SettingsView';
+import { HistoryView } from './components/HistoryView';
 import Papa from 'papaparse';
-import { Activity, Wind, Radio, Database, UploadCloud, Bot, BarChart2, Clock, Settings } from 'lucide-react';
+import { Activity, Wind, Radio, Database, UploadCloud, Bot, BarChart2, Clock, Settings, FileSpreadsheet } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'executive' | 'hvac' | 'imaging' | 'diagnostics' | 'sector' | 'live' | 'settings'>('executive');
+  const [activeTab, setActiveTab] = useState<'executive' | 'hvac' | 'imaging' | 'diagnostics' | 'sector' | 'live' | 'settings' | 'chat' | 'history'>('executive');
   const [data, setData] = useState<ProcessedTelemetryData[]>([]);
   const [isSimulated, setIsSimulated] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [autoCheckEnabled, setAutoCheckEnabled] = useState(
     localStorage.getItem('auto_check_enabled') !== 'false'
   );
+  const [hiddenTabs, setHiddenTabs] = useState<string[]>([]);
+  const [theme, setTheme] = useState<'dark' | 'light'>(localStorage.getItem('app_theme') as any || 'dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('app_theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('hidden_tabs');
+    if (saved) {
+      try { setHiddenTabs(JSON.parse(saved)); } catch (e) {}
+    }
+  }, []);
+
+  const toggleTabVisibility = (tabId: string) => {
+    setHiddenTabs(prev => {
+       const next = prev.includes(tabId) ? prev.filter(t => t !== tabId) : [...prev, tabId];
+       localStorage.setItem('hidden_tabs', JSON.stringify(next));
+       return next;
+    });
+  };
 
   const fetchData = () => {
     fetch(SHEET_URL)
@@ -138,12 +158,14 @@ export default function App() {
         <div className="filter-group">
           <label>Visões</label>
           <div className="space-y-2">
-            <TabButton active={activeTab === 'executive'} onClick={() => setActiveTab('executive')} icon={<Activity className="w-4 h-4" />}>Visão Executiva</TabButton>
-            <TabButton active={activeTab === 'live'} onClick={() => setActiveTab('live')} icon={<Clock className="w-4 h-4" />}>Monitoramento 15m</TabButton>
-            <TabButton active={activeTab === 'sector'} onClick={() => setActiveTab('sector')} icon={<BarChart2 className="w-4 h-4" />}>Análise Setorial (15m)</TabButton>
-            <TabButton active={activeTab === 'hvac'} onClick={() => setActiveTab('hvac')} icon={<Wind className="w-4 h-4" />}>Operação e HVAC</TabButton>
-            <TabButton active={activeTab === 'imaging'} onClick={() => setActiveTab('imaging')} icon={<Radio className="w-4 h-4" />}>Diag. Imagem</TabButton>
-            <TabButton active={activeTab === 'diagnostics'} onClick={() => setActiveTab('diagnostics')} icon={<Bot className="w-4 h-4" />}>AI Diagnostics</TabButton>
+            {!hiddenTabs.includes('executive') && <TabButton active={activeTab === 'executive'} onClick={() => setActiveTab('executive')} icon={<Activity className="w-4 h-4" />}>Visão Executiva</TabButton>}
+            {!hiddenTabs.includes('live') && <TabButton active={activeTab === 'live'} onClick={() => setActiveTab('live')} icon={<Clock className="w-4 h-4" />}>Monitoramento 15m</TabButton>}
+            {!hiddenTabs.includes('history') && <TabButton active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<FileSpreadsheet className="w-4 h-4" />}>Histórico de Alertas</TabButton>}
+            {!hiddenTabs.includes('sector') && <TabButton active={activeTab === 'sector'} onClick={() => setActiveTab('sector')} icon={<BarChart2 className="w-4 h-4" />}>Análise Setorial (15m)</TabButton>}
+            {!hiddenTabs.includes('hvac') && <TabButton active={activeTab === 'hvac'} onClick={() => setActiveTab('hvac')} icon={<Wind className="w-4 h-4" />}>Operação e HVAC</TabButton>}
+            {!hiddenTabs.includes('imaging') && <TabButton active={activeTab === 'imaging'} onClick={() => setActiveTab('imaging')} icon={<Radio className="w-4 h-4" />}>Diag. Imagem</TabButton>}
+            {!hiddenTabs.includes('diagnostics') && <TabButton active={activeTab === 'diagnostics'} onClick={() => setActiveTab('diagnostics')} icon={<Bot className="w-4 h-4" />}>AI Diagnostics</TabButton>}
+            {!hiddenTabs.includes('chat') && <TabButton active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<Bot className="w-4 h-4" />}>AI Assistant</TabButton>}
             <TabButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings className="w-4 h-4" />}>Configurações</TabButton>
           </div>
         </div>
@@ -174,7 +196,9 @@ export default function App() {
           {activeTab === 'hvac' && <HVACView data={data} />}
           {activeTab === 'imaging' && <ImagingView data={data} />}
           {activeTab === 'diagnostics' && <DiagnosticsView data={data} />}
-          {activeTab === 'settings' && <SettingsView />}
+          {activeTab === 'chat' && <AiChatView data={data} />}
+          {activeTab === 'history' && <HistoryView data={data} />}
+          {activeTab === 'settings' && <SettingsView hiddenTabs={hiddenTabs} toggleTabVisibility={toggleTabVisibility} theme={theme} setTheme={setTheme} />}
       </main>
     </div>
   );

@@ -25,7 +25,13 @@ export function getTariffBRLPerKWh(): number {
     // localStorage indisponível (ex: execução no cron server-side, fora do browser) — ignora e cai pro próximo nível
   }
 
-  const fromViteEnv = (import.meta as any)?.env?.VITE_TARIFF_BRL_PER_KWH;
+  let fromViteEnv = undefined;
+  try {
+    fromViteEnv = (import.meta as any)?.env?.VITE_TARIFF_BRL_PER_KWH;
+  } catch (e) {
+    // Ignore, might be running in Node
+  }
+
   const parsedViteEnv = fromViteEnv ? Number(String(fromViteEnv).replace(',', '.')) : NaN;
   if (!isNaN(parsedViteEnv) && parsedViteEnv > 0) return parsedViteEnv;
 

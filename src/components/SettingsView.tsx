@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Phone, Key, FileText, Plus, X, FlaskConical, Percent, DollarSign } from 'lucide-react';
+import { Settings, Save, Phone, Key, FileText, Plus, X, FlaskConical, Percent, DollarSign, Eye, EyeOff, Moon, Sun } from 'lucide-react';
 
-export function SettingsView() {
+interface Props {
+  hiddenTabs?: string[];
+  toggleTabVisibility?: (tabId: string) => void;
+  theme?: 'dark' | 'light';
+  setTheme?: (theme: 'dark' | 'light') => void;
+}
+
+export function SettingsView({ hiddenTabs = [], toggleTabVisibility, theme = 'dark', setTheme }: Props) {
   const [phoneNumbers, setPhoneNumbers] = useState<string[]>(['5511949102183']);
   const [newPhoneInput, setNewPhoneInput] = useState('');
   const [appId, setAppId] = useState('');
@@ -241,6 +248,94 @@ export function SettingsView() {
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="chart-container border-blue-500/20">
+        <h3 className="text-lg font-medium text-gray-200 mb-4 flex items-center gap-2">
+          {theme === 'dark' ? <Moon className="w-5 h-5 text-blue-400" /> : <Sun className="w-5 h-5 text-blue-400" />}
+          Aparência do Sistema
+        </h3>
+        
+        <p className="text-xs text-gray-500 mb-4">
+          Escolha entre o tema Escuro e o tema Claro. Esta configuração afeta a visualização em todo o aplicativo.
+        </p>
+
+        <div className="flex gap-4">
+          <button
+            onClick={() => setTheme?.('dark')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md border text-sm transition-colors ${theme === 'dark' ? 'bg-blue-900/10 border-blue-800/30 text-gray-200' : 'bg-[#1A1A1A] border-[#333] text-gray-500 hover:text-gray-300'}`}
+          >
+            <Moon className={`w-4 h-4 ${theme === 'dark' ? 'text-blue-400' : ''}`} />
+            Modo Escuro
+          </button>
+          <button
+            onClick={() => setTheme?.('light')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md border text-sm transition-colors ${theme === 'light' ? 'bg-blue-900/10 border-blue-800/30 text-gray-200' : 'bg-[#1A1A1A] border-[#333] text-gray-500 hover:text-gray-300'}`}
+          >
+            <Sun className={`w-4 h-4 ${theme === 'light' ? 'text-amber-400' : ''}`} />
+            Modo Claro
+          </button>
+        </div>
+      </div>
+
+      <div className="chart-container border-red-500/20">
+        <h3 className="text-lg font-medium text-gray-200 mb-4 flex items-center gap-2">
+          <FileText className="w-5 h-5 text-red-400" />
+          Dados Locais
+        </h3>
+        
+        <p className="text-xs text-gray-500 mb-4">
+          O sistema mantém um cache local no seu navegador com o histórico dos alertas. Se você estiver vendo dados fantasmas ou testes antigos, pode limpar este cache.
+        </p>
+
+        <button
+          onClick={() => {
+            if (window.confirm('Tem certeza que deseja apagar o histórico de alertas do seu navegador?')) {
+              localStorage.removeItem('alert_log');
+              alert('Cache local limpo com sucesso! A tela de histórico não mostrará mais esses dados (a menos que ainda existam na sua Planilha Google, se configurada).');
+              window.location.reload();
+            }
+          }}
+          className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 rounded text-sm hover:bg-red-500/20 transition-colors"
+        >
+          Limpar Cache Local de Alertas
+        </button>
+      </div>
+
+      <div className="chart-container border-purple-500/20">
+        <h3 className="text-lg font-medium text-gray-200 mb-4 flex items-center gap-2">
+          <Eye className="w-5 h-5 text-purple-400" />
+          Visibilidade das Abas
+        </h3>
+        
+        <p className="text-xs text-gray-500 mb-4">
+          Oculte ou exiba seções específicas no menu lateral da aplicação. Isso afetará apenas a interface no seu navegador.
+        </p>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { id: 'executive', label: 'Visão Executiva' },
+            { id: 'live', label: 'Monitoramento 15m' },
+            { id: 'history', label: 'Histórico de Alertas' },
+            { id: 'sector', label: 'Análise Setorial' },
+            { id: 'hvac', label: 'Operação e HVAC' },
+            { id: 'imaging', label: 'Diag. Imagem' },
+            { id: 'diagnostics', label: 'AI Diagnostics' },
+            { id: 'chat', label: 'AI Assistant' },
+          ].map((tab) => {
+            const isHidden = hiddenTabs.includes(tab.id);
+            return (
+              <button
+                key={tab.id}
+                onClick={() => toggleTabVisibility?.(tab.id)}
+                className={`flex items-center justify-between px-3 py-2 rounded-md border text-sm transition-colors ${isHidden ? 'bg-[#1A1A1A] border-[#333] text-gray-500' : 'bg-purple-900/10 border-purple-800/30 text-gray-200'}`}
+              >
+                <span>{tab.label}</span>
+                {isHidden ? <EyeOff className="w-4 h-4 text-gray-600" /> : <Eye className="w-4 h-4 text-purple-400" />}
+              </button>
+            );
+          })}
         </div>
       </div>
 
