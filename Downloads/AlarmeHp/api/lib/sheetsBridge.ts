@@ -16,6 +16,8 @@ export interface RemoteRow {
   band: string;
   loggedAt: string;
   resolvedAt: string;
+  excedenteKwh: number;
+  custoGeradoBRL: number;
 }
 
 async function callGet(): Promise<RemoteRow[]> {
@@ -44,9 +46,14 @@ export async function getRows(): Promise<RemoteRow[]> {
   return callGet();
 }
 
-export async function appendRow(sectorKey: string, band: string): Promise<void> {
+export async function appendRow(
+  sectorKey: string,
+  band: string,
+  excedenteKwh: number,
+  custoGeradoBRL: number
+): Promise<void> {
   if (!sheetsConfigured) return;
-  await callPost({ action: 'append', sectorKey, band });
+  await callPost({ action: 'append', sectorKey, band, excedenteKwh, custoGeradoBRL });
 }
 
 export async function resolveSectors(sectorKeys: string[]): Promise<void> {

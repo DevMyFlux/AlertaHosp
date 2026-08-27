@@ -30,12 +30,17 @@ export async function setActiveSectors(sectorKeysThatShouldStayActive: string[])
   await resolveSectors(toResolve);
 }
 
-// Registra um novo disparo de alerta (usado só para a estatística de
-// "ocorreu N vezes nos últimos 30 dias" e para abrir a linha "ativa" desse
-// setor).
-export async function recordAlert(anomaly: Pick<SectorAnomaly, 'sectorKey' | 'band'>): Promise<void> {
+// Registra um novo disparo de alerta (usado pra estatística de "ocorreu N
+// vezes nos últimos 30 dias", pra abrir a linha "ativa" desse setor, e —
+// desde a adição de excedenteKwh/custoEstimadoBRL — pra guardar o consumo
+// excedente e o custo financeiro daquele evento específico, permitindo
+// somar/consultar por setor sem precisar reconstruir a partir da telemetria
+// bruta.
+export async function recordAlert(
+  anomaly: Pick<SectorAnomaly, 'sectorKey' | 'band' | 'excedenteKwh' | 'custoEstimadoBRL'>
+): Promise<void> {
   if (!sheetsConfigured) return;
-  await appendRow(anomaly.sectorKey, anomaly.band);
+  await appendRow(anomaly.sectorKey, anomaly.band, anomaly.excedenteKwh, anomaly.custoEstimadoBRL);
 }
 
 export async function getRecentAlerts(hoursAgo: number): Promise<Pick<LoggedAlert, 'sectorKey' | 'band'>[]> {

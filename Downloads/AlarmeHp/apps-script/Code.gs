@@ -14,11 +14,15 @@
 //      já tem gatilhos de tempo nativos e gratuitos.
 
 // PREENCHA os dois valores abaixo antes de implantar:
-var SHARED_SECRET = 'COLE_AQUI_O_MESMO_VALOR_DE_CRON_SECRET_DA_VERCEL';
-var CRON_CHECK_URL = 'https://SEU-DOMINIO.vercel.app/api/cron-check';
+var SHARED_SECRET = 'f3f5354aedcd531fa6af5bc10f4bba093bde0ef26818a513785cdd7635057fd3';
+var CRON_CHECK_URL = 'https://alerme-hosp-drs8.vercel.app/api/cron-check';
 
 var TAB_NAME = 'EstadoAlertas';
-var HEADER = ['sectorKey', 'band', 'loggedAt', 'resolvedAt'];
+// excedenteKwh/custoGeradoBRL ficam nas colunas E/F (depois de resolvedAt) de
+// propósito — o "resolve" abaixo grava na coluna D por índice fixo
+// (getRange(i+1, 4)), então nada pode ser inserido entre band e resolvedAt
+// sem quebrar esse índice.
+var HEADER = ['sectorKey', 'band', 'loggedAt', 'resolvedAt', 'excedenteKwh', 'custoGeradoBRL'];
 
 function getOrCreateTab_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -27,6 +31,9 @@ function getOrCreateTab_() {
     sheet = ss.insertSheet(TAB_NAME);
     sheet.appendRow(HEADER);
   }
+  // Nota: se a aba JÁ EXISTIR (caso da planilha em produção), o cabeçalho
+  // atual da linha 1 não é migrado automaticamente — precisa adicionar
+  // "excedenteKwh" (E1) e "custoGeradoBRL" (F1) manualmente uma vez.
   return sheet;
 }
 
@@ -62,6 +69,8 @@ function doGet(e) {
         band: String(r[1]),
         loggedAt: toIso_(r[2]),
         resolvedAt: toIso_(r[3]),
+        excedenteKwh: Number(r[4]) || 0,
+        custoGeradoBRL: Number(r[5]) || 0,
       });
     }
     return jsonOutput_({ rows: rows });
@@ -71,7 +80,7 @@ function doGet(e) {
 }
 
 // POST .../exec?secret=...
-// Body JSON: { action: "append", sectorKey, band }
+// Body JSON: { action: "append", sectorKey, band, excedenteKwh, custoGeradoBRL }
 //   -> abre uma nova linha "ativa" (resolvedAt vazio) pro setor.
 // Body JSON: { action: "resolve", sectorKeys: [...] }
 //   -> marca resolvedAt = agora nas linhas ativas desses setores.
@@ -82,7 +91,14 @@ function doPost(e) {
     var sheet = getOrCreateTab_();
 
     if (body.action === 'append') {
-      sheet.appendRow([body.sectorKey, body.band, new Date().toISOString(), '']);
+      sheet.appendRow([
+        body.sectorKey,
+        body.band,
+        new Date().toISOString(),
+        '',
+        Number(body.excedenteKwh) || 0,
+        Number(body.custoGeradoBRL) || 0,
+      ]);
     } else if (body.action === 'resolve') {
       var wanted = {};
       (body.sectorKeys || []).forEach(function (k) { wanted[k] = true; });
