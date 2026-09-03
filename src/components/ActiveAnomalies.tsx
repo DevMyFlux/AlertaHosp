@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData } from '../types';
 import { buildSectorBandStats, detectSectorAnomalies, SectorAnomaly } from '../lib/anomalyDetection';
 import { AlertTriangle, Clock } from 'lucide-react';
+import { useHospital } from '../config/HospitalContext';
 
 interface Props {
   data: ProcessedTelemetryData[];
@@ -14,6 +15,7 @@ const severityWeight: Record<string, number> = {
 };
 
 export function ActiveAnomalies({ data }: Props) {
+  const { hospital } = useHospital();
   const [hoursToAnalyze, setHoursToAnalyze] = useState(12);
 
   const alerts = useMemo(() => {
@@ -27,7 +29,7 @@ export function ActiveAnomalies({ data }: Props) {
     // das demais para o mesmo instante — era uma das três implementações
     // duplicadas encontradas no sistema (as outras eram anomalyDetection.ts
     // e ImagingView.tsx). Unificado aqui.
-    const sStats = buildSectorBandStats(data);
+    const sStats = buildSectorBandStats(data, hospital.allSectors);
 
     const readingsPerHour = 4;
     const elementsToAnalyze = hoursToAnalyze * readingsPerHour;
@@ -40,7 +42,7 @@ export function ActiveAnomalies({ data }: Props) {
       // Últimas leituras até este ponto — usadas pro cálculo de tendência
       // (Etapa 5), sem olhar pro futuro em relação à linha analisada.
       const trendSlice = data.slice(Math.max(0, absoluteIndex - 7), absoluteIndex + 1);
-      activeAlerts.push(...detectSectorAnomalies(row, sStats, trendSlice));
+      activeAlerts.push(...detectSectorAnomalies(row, sStats, trendSlice, undefined, hospital.sectorMapping, hospital.allSectors));
     });
 
     activeAlerts.sort((a, b) => {
@@ -52,7 +54,7 @@ export function ActiveAnomalies({ data }: Props) {
 
     // Mantém só as 8 anomalias mais prioritárias
     return activeAlerts.slice(0, 8);
-  }, [data, hoursToAnalyze]);
+  }, [data, hoursToAnalyze, hospital.id]);
 
   const lastDate = data.length > 0 ? data[data.length - 1].timestamp.split(/[T ]/)[0] : '';
   const fmt = (v: number) => Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(v);

@@ -1,7 +1,8 @@
 import React from 'react';
-import { ProcessedTelemetryData, SECTORS } from '../types';
+import { ProcessedTelemetryData } from '../types';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { aggregateByPeriod } from '../data/processor';
+import { useHospital } from '../config/HospitalContext';
 
 interface Props {
   data: ProcessedTelemetryData[];
@@ -10,9 +11,10 @@ interface Props {
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 
 export function HVACView({ data }: Props) {
+  const { hospital } = useHospital();
   if (data.length === 0) return null;
 
-  const hvacDataPeriod = aggregateByPeriod(data, SECTORS.HVAC);
+  const hvacDataPeriod = aggregateByPeriod(data, hospital.sectors.HVAC);
 
   return (
     <div className="space-y-4">
@@ -37,7 +39,7 @@ export function HVACView({ data }: Props) {
                   labelFormatter={(label) => `Horário: ${label}`}
                 />
                 <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
-                {SECTORS.HVAC.map((sector, idx) => (
+                {hospital.sectors.HVAC.map((sector, idx) => (
                   <Area 
                     key={sector} 
                     type="step" 
@@ -72,7 +74,7 @@ export function HVACView({ data }: Props) {
                   formatter={(value: number, name: string) => [Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(value) + ' kWh', name]}
                 />
                 <Legend wrapperStyle={{ fontSize: '10px' }} />
-                {SECTORS.HVAC.map((sector, idx) => (
+                {hospital.sectors.HVAC.map((sector, idx) => (
                   <Bar 
                     key={sector}
                     dataKey={sector} 

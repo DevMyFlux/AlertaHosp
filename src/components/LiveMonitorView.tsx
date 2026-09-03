@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
+import { ProcessedTelemetryData } from '../types';
 import { logAlert } from '../lib/alertLog';
 import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatPercentualParam, formatExcedenteKwhParam, formatCustoEventoParam, formatImpactoMensalValorParam, formatOcorrenciasParam, formatCausaProvavelParam, formatAcaoRecomendadaParam, formatStandardAlertMessage, getActionText, getAlertMarginPct, SectorAnomaly } from '../lib/anomalyDetection';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send, Clock, RefreshCw, Database } from 'lucide-react';
+import { useHospital } from '../config/HospitalContext';
 
 interface Props {
   data: ProcessedTelemetryData[];
@@ -11,9 +12,15 @@ interface Props {
 }
 
 export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
+  const { hospital } = useHospital();
   const [notifying, setNotifying] = useState<Record<string, boolean>>({});
+  // Alertas automáticos ainda atendem só o hospital atual (backend/cron não
+  // foi estendido pra outros hospitais nesta rodada) — evita mandar alerta
+  // do HMB pros destinatários do hospital atual.
+  const notifyDisabled = hospital.id !== 'atual';
 
   const handleNotify = async (alertId: string, anomaly: SectorAnomaly) => {
+    if (notifyDisabled) return;
     setNotifying(prev => ({ ...prev, [alertId]: true }));
     try {
       const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
@@ -69,14 +76,14 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
 
     // Mesma base estatística (por setor e turno) usada no Relatório de
     // Diagnóstico da IA, aplicada apenas ao último registro de 15 minutos.
-    const sStats = buildSectorBandStats(data);
-    const alerts = detectSectorAnomalies(last, sStats, data);
+    const sStats = buildSectorBandStats(data, hospital.allSectors);
+    const alerts = detectSectorAnomalies(last, sStats, data, undefined, hospital.sectorMapping, hospital.allSectors);
     alerts.sort((a, b) => b.deviation - a.deviation);
 
     const total = Number(last.Total_Consumption || 0);
 
     return { lastRecord: last, alerts, totalPlant: total };
-  }, [data]);
+  }, [data, hospital.id]);
 
   // Registra automaticamente as anomalias ativas no histórico local
   React.useEffect(() => {
@@ -128,7 +135,7 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
         <div className="chart-container flex items-center justify-between col-span-1">
            <div>
              <div className="text-gray-400 text-xs font-semibold mb-1">TOTAL DE SETORES ANALISADOS</div>
-             <div className="text-2xl font-bold text-white font-mono">{ALL_SECTORS.length}</div>
+             <div className="text-2xl font-bold text-white font-mono">{hospital.allSectors.length}</div>
            </div>
            <Database className="text-emerald-500/50 w-8 h-8" />
         </div>
@@ -184,7 +191,7 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
                   : `Identificado pico crítico de consumo. O setor está operando com ${formatKw(alert.val)} kWh no intervalo de 15 minutos, caracterizando uma anomalia severa no perfil de carga.`;
 
               const normalSectors: {name: string, val: number}[] = [];
-              for (const k of ALL_SECTORS) {
+              for (const k of hospital.allSectors) {
                 if (k !== alert.sectorKey && !alerts.some(a => a.sectorKey === k)) {
                   normalSectors.push({ name: k.replace(/_Quality|ME_CLIM_|DJ\d+_/, '').replace(/_/g, ' '), val: Number(lastRecord[k]) || 0 });
                 }
@@ -217,8 +224,9 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
                         <div className="pt-2">
                           <button
                             onClick={() => handleNotify(alert.sectorKey + alert.time, alert)}
-                            disabled={notifying[alert.sectorKey + alert.time]}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-md border border-blue-500/30 transition-colors text-xs font-medium"
+                            disabled={notifying[alert.sectorKey + alert.time] || notifyDisabled}
+                            title={notifyDisabled ? 'Alertas automáticos deste hospital ainda não configurados' : undefined}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-md border border-blue-500/30 transition-colors text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             <Send className="w-3 h-3" />
                             {notifying[alert.sectorKey + alert.time] ? 'Enviando Notificação...' : 'Notificar Equipe (WhatsApp/SMS)'}

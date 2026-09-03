@@ -25,7 +25,13 @@ function parseNumber(val: any): number {
   return 0;
 }
 
-export function processCumulativeData(rawData: RawTelemetryData[]): ProcessedTelemetryData[] {
+// `allSectors`: opcional, default = ALL_SECTORS do hospital atual — permite
+// processar a telemetria de outro hospital (ver src/config/hospitals.ts)
+// sem afetar nenhum chamador existente que não passa esse argumento.
+export function processCumulativeData(
+  rawData: RawTelemetryData[],
+  allSectors: string[] = ALL_SECTORS
+): ProcessedTelemetryData[] {
   if (!rawData || rawData.length === 0) return [];
 
   const validData = rawData.filter(d => d && d.E3TimeStamp);
@@ -66,7 +72,7 @@ export function processCumulativeData(rawData: RawTelemetryData[]): ProcessedTel
     let totalConsumption = 0;
     let corruptedTags = 0;
 
-    ALL_SECTORS.forEach(sector => {
+    allSectors.forEach(sector => {
       const qualityKey = `${sector}_Quality`;
       
       const currentQuality = current[qualityKey] !== undefined ? parseNumber(current[qualityKey]) : 192;
@@ -95,7 +101,9 @@ export function processCumulativeData(rawData: RawTelemetryData[]): ProcessedTel
     });
 
     record['Total_Consumption'] = totalConsumption;
-    record['Data_Integrity'] = 1 - (corruptedTags / ALL_SECTORS.length);
+    // Guarda contra divisão por zero quando o hospital ainda não tem setor
+    // configurado (ex: HMB antes de definirmos sua lista real de setores).
+    record['Data_Integrity'] = allSectors.length ? 1 - (corruptedTags / allSectors.length) : 1;
 
     processed.push(record);
   }

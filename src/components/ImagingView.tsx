@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { ProcessedTelemetryData, SECTORS } from '../types';
+import { ProcessedTelemetryData } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { AlertTriangle } from 'lucide-react';
+import { useHospital } from '../config/HospitalContext';
 
 interface Props {
   data: ProcessedTelemetryData[];
@@ -16,18 +17,19 @@ const IMAGING_COLORS = {
 };
 
 export function ImagingView({ data }: Props) {
-  
+  const { hospital } = useHospital();
+
   // Calculate median for anomaly table
   const anomalies = useMemo(() => {
     if (!data.length) return [];
-    
+
     const stats: Record<string, { total: number, count: number, values: number[], median: number }> = {};
-    SECTORS.IMAGING.forEach(sector => {
+    hospital.sectors.IMAGING.forEach(sector => {
       stats[sector] = { total: 0, count: 0, values: [], median: 0 };
     });
 
     data.forEach(row => {
-      SECTORS.IMAGING.forEach(sector => {
+      hospital.sectors.IMAGING.forEach(sector => {
         const val = row[sector] as number;
         if (val > 0) {
           stats[sector].values.push(val);
@@ -36,7 +38,7 @@ export function ImagingView({ data }: Props) {
     });
 
     // Calc median
-    SECTORS.IMAGING.forEach(sector => {
+    hospital.sectors.IMAGING.forEach(sector => {
       const vals = stats[sector].values.sort((a, b) => a - b);
       if (vals.length > 0) {
         const mid = Math.floor(vals.length / 2);
@@ -47,7 +49,7 @@ export function ImagingView({ data }: Props) {
     // Find anomalies (> 150% of median and val > 10)
     const foundAlerts: any[] = [];
     data.forEach(row => {
-      SECTORS.IMAGING.forEach(sector => {
+      hospital.sectors.IMAGING.forEach(sector => {
         const val = row[sector] as number;
         const med = stats[sector].median;
         if (val > 10 && med > 0 && val > med * 1.5) {
@@ -64,7 +66,7 @@ export function ImagingView({ data }: Props) {
 
     return foundAlerts.sort((a, b) => b.value - a.value).slice(0, 10); // top 10
 
-  }, [data]);
+  }, [data, hospital.id]);
 
 
   if (data.length === 0) return null;
@@ -93,7 +95,7 @@ export function ImagingView({ data }: Props) {
                 />
                 <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
                 
-                {SECTORS.IMAGING.map(sector => (
+                {hospital.sectors.IMAGING.map(sector => (
                   <Line 
                     key={sector} 
                     type="monotone" 

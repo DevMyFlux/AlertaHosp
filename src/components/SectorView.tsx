@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { ProcessedTelemetryData } from '../types';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { useHospital } from '../config/HospitalContext';
 
 interface Props {
   data: ProcessedTelemetryData[];
 }
 
 export function SectorView({ data }: Props) {
+  const { hospital } = useHospital();
   const availableDates = useMemo(() => {
     const dates = new Set<string>();
     data.forEach(d => {
@@ -17,7 +19,14 @@ export function SectorView({ data }: Props) {
     return Array.from(dates);
   }, [data]);
 
-  const [selectedSector, setSelectedSector] = useState<string>(ALL_SECTORS[0]);
+  // '' quando o hospital ainda não tem setor configurado (ex: HMB) — os
+  // usos abaixo (Number(d[''])) degradam pra 0 sem quebrar a tela.
+  const [selectedSector, setSelectedSector] = useState<string>(hospital.allSectors[0] || '');
+  // Troca o setor selecionado ao trocar de hospital, senão fica preso ao
+  // setor do hospital anterior (que pode nem existir no novo).
+  useEffect(() => {
+    setSelectedSector(hospital.allSectors[0] || '');
+  }, [hospital.id]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [startTimestamp, setStartTimestamp] = useState<string>('');
   const [endTimestamp, setEndTimestamp] = useState<string>('');
@@ -144,7 +153,7 @@ export function SectorView({ data }: Props) {
               value={selectedSector} 
               onChange={(e) => setSelectedSector(e.target.value)}
             >
-              {ALL_SECTORS.map(sec => (
+              {hospital.allSectors.map(sec => (
                 <option key={sec} value={sec}>
                   {sec.replace('DJ', '').replace('.ME_CLIM_', 'CLIM ').replace('ME_CLIM_', 'CLIM ')}
                 </option>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { generateMockData } from './data/mockData';
 import { processCumulativeData } from './data/processor';
 import { ProcessedTelemetryData } from './types';
-import { SHEET_URL } from './config/sheet';
+import { useHospital } from './config/HospitalContext';
 import { ExecutiveView } from './components/ExecutiveView';
 import { HVACView } from './components/HVACView';
 import { ImagingView } from './components/ImagingView';
@@ -16,10 +16,11 @@ import { LiveMonitorView } from './components/LiveMonitorView';
 import { SettingsView } from './components/SettingsView';
 import { HistoryView } from './components/HistoryView';
 import Papa from 'papaparse';
-import { Activity, Wind, Radio, Database, UploadCloud, Bot, BarChart2, Clock, Settings, FileSpreadsheet } from 'lucide-react';
+import { Activity, Wind, Radio, Database, UploadCloud, Bot, BarChart2, Clock, Settings, FileSpreadsheet, Building2 } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function App() {
+  const { hospital, hospitalId, setHospitalId, hospitals } = useHospital();
   const [activeTab, setActiveTab] = useState<'executive' | 'hvac' | 'imaging' | 'diagnostics' | 'sector' | 'live' | 'settings' | 'history'>('executive');
   const [data, setData] = useState<ProcessedTelemetryData[]>([]);
   const [isSimulated, setIsSimulated] = useState(true);
@@ -51,7 +52,16 @@ export default function App() {
   };
 
   const fetchData = () => {
-    fetch(SHEET_URL)
+    if (!hospital.sheetUrl) {
+      // Hospital sem planilha configurada ainda (ex: HMB antes da integração
+      // existir) — não cai no mock, que fingiria dado real que não existe.
+      // Mostra estado vazio de verdade.
+      setData([]);
+      setIsSimulated(false);
+      setLastUpdate(new Date());
+      return;
+    }
+    fetch(hospital.sheetUrl)
       .then(response => {
         if (!response.ok) throw new Error("Network response was not ok");
         return response.text();
@@ -64,7 +74,7 @@ export default function App() {
             try {
               if (results.data && results.data.length > 0) {
                 const raw = results.data as any[];
-                const processed = processCumulativeData(raw);
+                const processed = processCumulativeData(raw, hospital.allSectors);
                 setData(processed);
                 setIsSimulated(false);
                 setLastUpdate(new Date());
@@ -74,7 +84,7 @@ export default function App() {
             } catch (error) {
               console.warn("Parse error:", error);
               const mock = generateMockData();
-              const processedMock = processCumulativeData(mock);
+              const processedMock = processCumulativeData(mock, hospital.allSectors);
               setData(processedMock);
               setIsSimulated(true);
               setLastUpdate(new Date());
@@ -85,17 +95,18 @@ export default function App() {
       .catch(err => {
         console.warn("Fetch error:", err);
         const mock = generateMockData();
-        const processedMock = processCumulativeData(mock);
+        const processedMock = processCumulativeData(mock, hospital.allSectors);
         setData(processedMock);
         setIsSimulated(true);
         setLastUpdate(new Date());
       });
   };
 
-  // Load Sim Data on mount and refresh every 15 minutes (900000 ms) if enabled
+  // Carrega ao montar, ao trocar de hospital, e refresca a cada 15 minutos
+  // (900000 ms) se o auto-check estiver ligado.
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [hospital.id]);
 
   useEffect(() => {
     localStorage.setItem('auto_check_enabled', String(autoCheckEnabled));
@@ -106,7 +117,7 @@ export default function App() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [autoCheckEnabled]);
+  }, [autoCheckEnabled, hospital.id]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -118,7 +129,7 @@ export default function App() {
       complete: (results) => {
         try {
           const raw = results.data as any[];
-          const processed = processCumulativeData(raw);
+          const processed = processCumulativeData(raw, hospital.allSectors);
           setData(processed);
           setIsSimulated(false);
         } catch (error) {
@@ -149,7 +160,9 @@ export default function App() {
             </button>
             <div className="flex items-center">
               <Database className="w-3 h-3 mr-1 text-gray-400" />
-              FONTE: <span className="ml-1" style={{ color: isSimulated ? 'var(--accent-amber)' : 'var(--accent-green)' }}>{isSimulated ? 'MOCK' : 'CSV'}</span>
+              FONTE: <span className="ml-1" style={{ color: !hospital.sheetUrl ? 'var(--accent-amber)' : isSimulated ? 'var(--accent-amber)' : 'var(--accent-green)' }}>
+                {!hospital.sheetUrl ? 'SEM PLANILHA' : isSimulated ? 'MOCK' : 'CSV'}
+              </span>
             </div>
             <div>STATUS: <span className="status-dot status-good"></span>OPERACIONAL</div>
         </div>
@@ -157,8 +170,24 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className="sidebar">
-        
+
         <div className="filter-group">
+          <label>Hospital</label>
+          <div className="flex items-center gap-2 bg-[#1A1A1A] border border-[#333] px-3 py-1.5 rounded-md">
+            <Building2 className="w-4 h-4 text-gray-400" />
+            <select
+              className="bg-transparent text-sm text-gray-200 outline-none border-none w-full"
+              value={hospitalId}
+              onChange={e => setHospitalId(e.target.value)}
+            >
+              {hospitals.map(h => (
+                <option key={h.id} value={h.id}>{h.label}{!h.sheetUrl ? ' (sem planilha)' : ''}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="filter-group mt-4">
           <label>Visões</label>
           <div className="space-y-2">
             {!hiddenTabs.includes('executive') && <TabButton active={activeTab === 'executive'} onClick={() => setActiveTab('executive')} icon={<Activity className="w-4 h-4" />}>Visão Executiva</TabButton>}

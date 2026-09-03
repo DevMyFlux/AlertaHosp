@@ -1,18 +1,26 @@
 import React, { useMemo, useState } from 'react';
-import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
+import { ProcessedTelemetryData } from '../types';
 import { formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatPercentualParam, formatExcedenteKwhParam, formatCustoEventoParam, formatImpactoMensalValorParam, formatOcorrenciasParam, formatCausaProvavelParam, formatAcaoRecomendadaParam, formatStandardAlertMessage, getActionText, SectorAnomaly } from '../lib/anomalyDetection';
 import { getAlertLogSince } from '../lib/alertLog';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send } from 'lucide-react';
+import { useHospital } from '../config/HospitalContext';
 
 interface Props {
   data: ProcessedTelemetryData[];
 }
 
 export function DiagnosticsView({ data }: Props) {
+  const { hospital } = useHospital();
   const [hoursToAnalyze, setHoursToAnalyze] = useState(12);
   const [notifying, setNotifying] = useState<Record<string, boolean>>({});
 
+  // Alertas automáticos ainda atendem só o hospital atual (backend/cron não
+  // foi estendido pra outros hospitais nesta rodada) — evita mandar alerta
+  // do HMB pros destinatários do hospital atual.
+  const notifyDisabled = hospital.id !== 'atual';
+
   const handleNotify = async (alertId: string, anomaly: SectorAnomaly) => {
+    if (notifyDisabled) return;
     setNotifying(prev => ({ ...prev, [alertId]: true }));
     try {
       const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
@@ -205,7 +213,7 @@ export function DiagnosticsView({ data }: Props) {
                   totalPlant = Number(rowData.Total_Consumption || 0);
                   
                   // Find a couple of normal sectors
-                  const allKeys = ALL_SECTORS;
+                  const allKeys = hospital.allSectors;
                   for (const k of allKeys) {
                     if (k !== mainAlert.sectorKey && !alerts.some(a => a.sectorKey === k && a.time === mainAlert.time)) {
                       normalSectors.push({ name: k, val: Number(rowData[k as keyof typeof rowData]) || 0 });
@@ -230,7 +238,7 @@ export function DiagnosticsView({ data }: Props) {
                    
                    // Check if it's the highest in the row
                    if (rowData) {
-                      const maxVal = Math.max(...ALL_SECTORS.map(k => Number(rowData[k as keyof typeof rowData]) || 0));
+                      const maxVal = Math.max(...hospital.allSectors.map(k => Number(rowData[k as keyof typeof rowData]) || 0));
                         
                       if (mainAlert.val >= maxVal) {
                          diagnosticText += ` (representa o maior consumo registrado na planta no momento).`;
@@ -276,8 +284,9 @@ export function DiagnosticsView({ data }: Props) {
                       <div className="pt-2">
                         <button
                           onClick={() => handleNotify(mainAlert.sectorKey + mainAlert.time, mainAlert)}
-                          disabled={notifying[mainAlert.sectorKey + mainAlert.time]}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-md border border-blue-500/30 transition-colors text-xs font-medium"
+                          disabled={notifying[mainAlert.sectorKey + mainAlert.time] || notifyDisabled}
+                          title={notifyDisabled ? 'Alertas automáticos deste hospital ainda não configurados' : undefined}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-md border border-blue-500/30 transition-colors text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Send className="w-3 h-3" />
                           {notifying[mainAlert.sectorKey + mainAlert.time] ? 'Enviando Notificação...' : 'Notificar Equipe (WhatsApp/SMS)'}

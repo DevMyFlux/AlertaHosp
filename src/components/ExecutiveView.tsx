@@ -1,14 +1,16 @@
 import React from 'react';
-import { ProcessedTelemetryData, ALL_SECTORS } from '../types';
+import { ProcessedTelemetryData } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Activity, Zap, ShieldAlert, Cpu } from 'lucide-react';
 import { ActiveAnomalies } from './ActiveAnomalies';
+import { useHospital } from '../config/HospitalContext';
 
 interface Props {
   data: ProcessedTelemetryData[];
 }
 
 export function ExecutiveView({ data }: Props) {
+  const { hospital } = useHospital();
   if (data.length === 0) return null;
 
   // KPIs
@@ -23,7 +25,7 @@ export function ExecutiveView({ data }: Props) {
   // Pareto Chart Data (Top Consumers)
   const sectorConsumption: Record<string, number> = {};
   data.forEach(row => {
-    ALL_SECTORS.forEach(sector => {
+    hospital.allSectors.forEach(sector => {
       sectorConsumption[sector] = (sectorConsumption[sector] || 0) + (row[sector] as number);
     });
   });

@@ -4,13 +4,15 @@ import { Filter, Search, AlertCircle, FileSpreadsheet, Loader2 } from 'lucide-re
 import { formatBRL, calcFinancialImpact } from '../lib/costEstimation';
 import * as XLSX from 'xlsx';
 import { ProcessedTelemetryData } from '../types';
-import { buildSectorBandStats, getAlertMarginPct, SECTOR_MAPPING } from '../lib/anomalyDetection';
+import { buildSectorBandStats, getAlertMarginPct } from '../lib/anomalyDetection';
+import { useHospital } from '../config/HospitalContext';
 
 interface Props {
   data: ProcessedTelemetryData[];
 }
 
 export function HistoryView({ data }: Props) {
+  const { hospital } = useHospital();
   const [localLogs] = useState<LoggedAlert[]>(getAlertLog());
   const [remoteLogs, setRemoteLogs] = useState<LoggedAlert[]>([]);
   const [loadingRemote, setLoadingRemote] = useState(true);
@@ -21,7 +23,16 @@ export function HistoryView({ data }: Props) {
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
 
+  // O histórico remoto (/api/alert-history) ainda atende só o hospital
+  // atual — o backend não foi estendido pra outros hospitais nesta rodada.
+  const remoteHistoryAvailable = hospital.id === 'atual';
+
   useEffect(() => {
+    if (!remoteHistoryAvailable) {
+      setRemoteLogs([]);
+      setLoadingRemote(false);
+      return;
+    }
     // Fetch real backend history from Google Sheets
     fetch('/api/alert-history')
       .then(res => {
@@ -32,9 +43,9 @@ export function HistoryView({ data }: Props) {
       })
       .then(json => {
         if (!json || !json.rows) return;
-        
+
         // sStats for historical threshold reconstruction
-        const sStats = buildSectorBandStats(data);
+        const sStats = buildSectorBandStats(data, hospital.allSectors);
         const marginPct = getAlertMarginPct();
 
         const reconstructed: LoggedAlert[] = json.rows.map((r: any) => {
@@ -58,7 +69,7 @@ export function HistoryView({ data }: Props) {
           // Alguns setores HVAC têm um "." indevido prefixado no nome da coluna
           // real da planilha (bug pré-existente em src/types.ts, fora do escopo
           // desta mudança) — normaliza antes do lookup pra não cair no fallback.
-          const sectorName = SECTOR_MAPPING[r.sectorKey.replace(/^\./, '')]?.label || r.sectorKey;
+          const sectorName = hospital.sectorMapping[r.sectorKey.replace(/^\./, '')]?.label || r.sectorKey;
 
           // Excedente/custo já vêm exatos do histórico persistido (gravados no
           // momento real do alerta, junto com a mensagem enviada) — não
@@ -107,7 +118,7 @@ export function HistoryView({ data }: Props) {
       })
       .catch(err => console.warn("Aviso (Sincronização): Não foi possível carregar o histórico remoto:", err))
       .finally(() => setLoadingRemote(false));
-  }, [data]);
+  }, [data, remoteHistoryAvailable, hospital.id]);
 
   const allLogs = useMemo(() => {
     // Merge local and remote, deduplicating by sectorKey and timestamp (within 1 hour)
@@ -303,6 +314,20 @@ export function HistoryView({ data }: Props) {
         </div>
       </div>
 
+      {!remoteHistoryAvailable && (
+        <div className="chart-container border border-amber-500/30 bg-amber-950/10 flex items-start gap-3">
+          <AlertCircle className="text-amber-500 w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <div className="text-amber-400 font-semibold text-sm">Histórico automático deste hospital ainda não configurado</div>
+            <div className="text-gray-400 text-sm mt-1">
+              O backend que grava e consulta o histórico de alertas (planilha "EstadoAlertas" + Apps Script) ainda atende só o Hospital Atual.
+              Assim que a integração do {hospital.label} existir, esta tela passa a mostrar os alertas dele aqui também.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {remoteHistoryAvailable && (<>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="chart-container flex items-center justify-between col-span-1">
            <div>
@@ -445,6 +470,7 @@ export function HistoryView({ data }: Props) {
           )}
         </div>
       </div>
+      </>)}
 
     </div>
   );

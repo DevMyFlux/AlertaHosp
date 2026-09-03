@@ -103,9 +103,15 @@ const BASELINE_WINDOW = 1000;
 // anomalia. `data` deve vir ordenado do mais antigo pro mais recente (mesmo
 // formato que processCumulativeData já produz) — assim, cortar os últimos
 // BASELINE_WINDOW de cada grupo pega sempre os mais recentes.
-export function buildSectorBandStats(data: ProcessedTelemetryData[]): Record<string, Record<TimeBand, SectorStats>> {
+// `allSectors`: opcional, default = ALL_SECTORS do hospital atual — permite
+// rodar a mesma função pra outro hospital (ver src/config/hospitals.ts) sem
+// afetar nenhum chamador existente que não passa esse argumento.
+export function buildSectorBandStats(
+  data: ProcessedTelemetryData[],
+  allSectors: string[] = ALL_SECTORS
+): Record<string, Record<TimeBand, SectorStats>> {
   const histData: Record<string, Record<TimeBand, number[]>> = {};
-  ALL_SECTORS.forEach(sec => {
+  allSectors.forEach(sec => {
     histData[sec] = {
       'Café da Manhã (07-10h)': [],
       'Almoço (10-14h)': [],
@@ -116,7 +122,7 @@ export function buildSectorBandStats(data: ProcessedTelemetryData[]): Record<str
 
   data.forEach(row => {
     const band = getBand(row.hour);
-    ALL_SECTORS.forEach(sec => {
+    allSectors.forEach(sec => {
       const val = Number(row[sec]);
       if (!isNaN(val) && val > 0) {
         histData[sec][band].push(val);
@@ -125,7 +131,7 @@ export function buildSectorBandStats(data: ProcessedTelemetryData[]): Record<str
   });
 
   const sStats: Record<string, Record<TimeBand, SectorStats>> = {};
-  ALL_SECTORS.forEach(sec => {
+  allSectors.forEach(sec => {
     sStats[sec] = {} as Record<TimeBand, SectorStats>;
     (Object.keys(histData[sec]) as TimeBand[]).forEach(band => {
       const ultimosMil = histData[sec][band].slice(-BASELINE_WINDOW);
@@ -519,7 +525,11 @@ export function detectSectorAnomalies(
   // que no servidor não existe e sempre voltaria vazio. Só sectorKey/band
   // são de fato lidos abaixo, por isso o tipo reduzido (Pick) — permite que
   // o cron injete objetos sem precisar reconstruir um LoggedAlert completo.
-  recentAlertsOverride?: Pick<LoggedAlert, 'sectorKey' | 'band'>[]
+  recentAlertsOverride?: Pick<LoggedAlert, 'sectorKey' | 'band'>[],
+  // Mesma lógica do `allSectors` de buildSectorBandStats: default = hospital
+  // atual, só quem precisa avaliar outro hospital passa explicitamente.
+  sectorMapping: typeof SECTOR_MAPPING = SECTOR_MAPPING,
+  allSectors: string[] = ALL_SECTORS
 ): SectorAnomaly[] {
   const band = getBand(row.hour);
   const dateStr = row.timestamp.split(/[T ]/)[0];
@@ -530,8 +540,8 @@ export function detectSectorAnomalies(
   const marginPct = getAlertMarginPct();
   const marginMultiplier = 1 + marginPct / 100;
 
-  Object.keys(SECTOR_MAPPING).forEach(sec => {
-    const actualKey = ALL_SECTORS.find(k => k.includes(sec)) || sec;
+  Object.keys(sectorMapping).forEach(sec => {
+    const actualKey = allSectors.find(k => k.includes(sec)) || sec;
     const val = Number(row[actualKey]);
     const s = sStats[actualKey]?.[band];
 
@@ -563,12 +573,12 @@ export function detectSectorAnomalies(
     const classicUpperLimit = s.mean * marginMultiplier;
     const crossValidated = val > classicUpperLimit;
 
-    const mapInfo = SECTOR_MAPPING[sec];
+    const mapInfo = sectorMapping[sec];
     let subVal = 0;
     let subMedian = 1;
     let actualSubKey = '';
     if (mapInfo.sub) {
-      actualSubKey = ALL_SECTORS.find(k => k.includes(mapInfo.sub!)) || mapInfo.sub;
+      actualSubKey = allSectors.find(k => k.includes(mapInfo.sub!)) || mapInfo.sub;
       subVal = Number(row[actualSubKey]) || 0;
       subMedian = sStats[actualSubKey]?.[band]?.median || 1;
     }
