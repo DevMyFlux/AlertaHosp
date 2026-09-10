@@ -13,9 +13,13 @@
 // nenhum outro arquivo do frontend precisa mudar (HospitalContext.tsx
 // distribui a entrada ativa pros componentes). O backend espelha esta
 // config em api/lib/hospitalRuntime.ts.
-import { SECTORS, ALL_SECTORS } from '../types';
-import { SECTOR_MAPPING, UNIFIED_TEMPLATE_NAME } from '../lib/anomalyDetection';
-import { SHEET_URL } from './sheet';
+// Extensões .js explícitas: este módulo é importado tanto pelo frontend
+// (Vite, resolve sem extensão) quanto pelo backend serverless via
+// api/lib/hospitalRuntime.ts (o bundler da Vercel exige a extensão, igual
+// aos outros imports de src/ feitos por api/).
+import { SECTORS, ALL_SECTORS } from '../types.js';
+import { SECTOR_MAPPING, UNIFIED_TEMPLATE_NAME } from '../lib/anomalyDetection.js';
+import { SHEET_URL } from './sheet.js';
 
 export interface SectorMappingEntry {
   label: string;
