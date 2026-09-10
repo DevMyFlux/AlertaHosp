@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ProcessedTelemetryData } from '../types';
 import { logAlert } from '../lib/alertLog';
-import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatPercentualParam, formatExcedenteKwhParam, formatCustoEventoParam, formatImpactoMensalValorParam, formatOcorrenciasParam, formatCausaProvavelParam, formatAcaoRecomendadaParam, formatStandardAlertMessage, getActionText, getAlertMarginPct, SectorAnomaly } from '../lib/anomalyDetection';
+import { buildSectorBandStats, detectSectorAnomalies, formatSectorParam, formatValorParam, formatSetorNomeParam, formatDataHoraParam, formatPercentualParam, formatExcedenteKwhParam, formatCustoEventoParam, formatImpactoMensalValorParam, formatOcorrenciasParam, formatCausaProvavelParam, formatAcaoRecomendadaParam, formatStandardAlertMessage, getActionText, getAlertMarginPct, withHospitalPrefix, SectorAnomaly } from '../lib/anomalyDetection';
 import { Bot, AlertTriangle, CheckCircle2, Activity, Send, Clock, RefreshCw, Database } from 'lucide-react';
 import { useHospital } from '../config/HospitalContext';
 
@@ -27,13 +27,16 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
       const appId = localStorage.getItem('vonage_app_id');
       const privateKey = localStorage.getItem('vonage_private_key');
       const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
-      const message = formatStandardAlertMessage(anomaly);
-      const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
-      const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
-      const templateParams = anomaly.templateOverride
+      // Nome do setor com o hospital no texto do alerta (WhatsApp/número
+      // compartilhado). Não mexe no que o dashboard mostra nem no logAlert.
+      const forAlert = withHospitalPrefix(anomaly, hospital.label, hospital.id === 'atual');
+      const message = formatStandardAlertMessage(forAlert);
+      const sectorParam = formatSectorParam(forAlert.sectorName, forAlert.severity);
+      const valor = formatValorParam(forAlert.val, forAlert.expectedMax);
+      const templateParams = forAlert.templateOverride
         ? [
-            formatDataHoraParam(anomaly),
-            formatSetorNomeParam(anomaly.sectorName),
+            formatDataHoraParam(forAlert),
+            formatSetorNomeParam(forAlert.sectorName),
             formatPercentualParam(anomaly),
             formatExcedenteKwhParam(anomaly),
             formatCustoEventoParam(anomaly),

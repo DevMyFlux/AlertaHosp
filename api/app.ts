@@ -20,6 +20,7 @@ import {
   formatCausaProvavelParam,
   formatAcaoRecomendadaParam,
   formatStandardAlertMessage,
+  withHospitalPrefix,
 } from "../src/lib/anomalyDetection.js";
 
 const ai = new GoogleGenAI({
@@ -136,13 +137,16 @@ app.all("/api/cron-check", async (req, res) => {
       // que persistido no Redis pra sobreviver entre execuções serverless).
       if (activeSectors.has(anomaly.sectorKey)) continue;
 
-      const message = formatStandardAlertMessage(anomaly);
-      const sectorParam = formatSectorParam(anomaly.sectorName, anomaly.severity);
-      const valor = formatValorParam(anomaly.val, anomaly.expectedMax);
-      const templateParams = anomaly.templateOverride
+      // Nome do setor prefixado com o hospital só no texto do alerta (o
+      // WhatsApp é compartilhado — chega como "Alerta HCN" pros dois).
+      const forAlert = withHospitalPrefix(anomaly, runtime.label, runtime.id === 'atual');
+      const message = formatStandardAlertMessage(forAlert);
+      const sectorParam = formatSectorParam(forAlert.sectorName, forAlert.severity);
+      const valor = formatValorParam(forAlert.val, forAlert.expectedMax);
+      const templateParams = forAlert.templateOverride
         ? [
-            formatDataHoraParam(anomaly),
-            formatSetorNomeParam(anomaly.sectorName),
+            formatDataHoraParam(forAlert),
+            formatSetorNomeParam(forAlert.sectorName),
             formatPercentualParam(anomaly),
             formatExcedenteKwhParam(anomaly),
             formatCustoEventoParam(anomaly),

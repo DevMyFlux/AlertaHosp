@@ -245,6 +245,21 @@ export function formatSectorParam(sectorName: string, _severity: string): string
   return sectorName;
 }
 
+// Prefixa o nome do setor com o rótulo do hospital, SÓ na hora de montar o
+// alerta (WhatsApp/SMS). O número e o template do WhatsApp são
+// compartilhados entre hospitais (a mensagem chega sempre como "Alerta
+// HCN"), então sem isso não dá pra saber de qual hospital veio o alerta.
+// Não afeta o nome mostrado no dashboard — passe a anomalia decorada só
+// pros format*Param/formatStandardAlertMessage, não pro logAlert/recordAlert.
+export function withHospitalPrefix<T extends { sectorName: string }>(
+  anomaly: T,
+  hospitalLabel: string,
+  isDefaultHospital: boolean
+): T {
+  if (isDefaultHospital || !hospitalLabel) return anomaly;
+  return { ...anomaly, sectorName: `${hospitalLabel} - ${anomaly.sectorName}` };
+}
+
 export function formatValorParam(val: number, _expectedMax: number): string {
   return kwhFormatter.format(val);
 }
