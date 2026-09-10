@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-16"?>
+<!--
+  Tarefa do Agendador do Windows: roda o sync de telemetria do HMB a cada
+  15 minutos, começa junto com a máquina, e reinicia sozinha se falhar.
+
+  Espelha a tarefa \CZGM_SyncEnergia da máquina do HCN (rodar_sync.bat a
+  cada 15 min, timeout de 10 min, logon interativo, usuário local) e
+  ADICIONA o que o HCN não tem: IgnoreNew (não sobrepõe execuções),
+  BootTrigger e RestartOnFailure.
+
+  ANTES DE IMPORTAR (confira estes 2 valores):
+    1. <Command>/<WorkingDirectory>: assumido C:\AlertaHosp-HMB — troque se
+       você colocou a pasta em outro lugar.
+    2. <UserId>BRASILIANA\brasi</UserId>: assumido pelo que apareceu no
+       prompt da máquina (C:\Users\brasi). Confirme com  whoami  no cmd e
+       troque se for outro (no HCN é SERVIDOR\CCO). Tem que ser o MESMO
+       usuário que tem o token_hmb.json no perfil.
+
+  Logon interativo (igual ao HCN): a tarefa só roda com esse usuário
+  logado na máquina. Se o HMB costuma ficar deslogado, na aba "Geral" da
+  tarefa marque "Executar estando o usuário conectado ou não" (vai pedir a
+  senha do usuário uma vez).
+
+  IMPORTAR:  Agendador de Tarefas > Ação > Importar Tarefa... > este XML.
+  Ou via linha de comando (PowerShell como Admin):
+    schtasks /Create /TN "AlertaHosp HMB Sync" /XML "AlertaHosp-HMB-Sync.xml"
+-->
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Sincroniza a telemetria de energia do HMB (SQL Server Elipse) para a planilha Google, a cada 15 minutos. Parte do sistema AlertaHosp.</Description>
+    <URI>\AlertaHosp HMB Sync</URI>
+  </RegistrationInfo>
+  <Triggers>
+    <!-- A cada 15 min, indefinidamente, a partir da data abaixo (a data em
+         si não importa; PT15M = período de 15 minutos). -->
+    <CalendarTrigger>
+      <StartBoundary>2026-01-01T00:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByDay>
+        <DaysInterval>1</DaysInterval>
+      </ScheduleByDay>
+      <Repetition>
+        <Interval>PT15M</Interval>
+        <Duration>P1D</Duration>
+        <StopAtDurationEnd>false</StopAtDurationEnd>
+      </Repetition>
+    </CalendarTrigger>
+    <!-- Também dispara uma vez quando a máquina liga (com 1 min de atraso
+         pra rede/SQL subirem). -->
+    <BootTrigger>
+      <Enabled>true</Enabled>
+      <Delay>PT1M</Delay>
+    </BootTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>BRASILIANA\brasi</UserId>
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT10M</ExecutionTimeLimit>
+    <Priority>7</Priority>
+    <RestartOnFailure>
+      <Interval>PT2M</Interval>
+      <Count>3</Count>
+    </RestartOnFailure>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>C:\AlertaHosp-HMB\rodar_sync_hmb.bat</Command>
+      <WorkingDirectory>C:\AlertaHosp-HMB</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>

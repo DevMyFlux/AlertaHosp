@@ -65,3 +65,58 @@ Se precisar reimplantar o script depois de editar `Code.gs` (ex: trocar a
 URL ou o segredo), use **Implantar > Gerenciar implantações > editar
 (ícone de lápis) > Nova versão > Implantar** — só criar uma implantação nova
 gera uma URL diferente, então prefira sempre editar a implantação existente.
+
+---
+
+## HMB (segundo hospital) — `Code_HMB.gs`
+
+Stack **isolado** do HCN: planilha própria, Web App próprio, segredo próprio,
+gatilho próprio. Nada do HCN acima muda.
+
+### Planilha
+`1_pkDSva4K9pgqXgTM3jCMdU5cbNDKEVMyzRWIC0Hihc` (planilha de **estado de
+alertas** do HMB — não é a de telemetria). Extensões > Apps Script, apague o
+`Code.gs` padrão e cole [`Code_HMB.gs`](./Code_HMB.gs).
+
+Web App implantado: `https://script.google.com/macros/s/AKfycbyTR0VWKfU-pLn_eFSKEuz6v2lPsGLGBUMH1sg2MVFNEbPFp7L47KfIZFu66PAXLAA-/exec`
+(vira a env `SHEETS_WEBAPP_URL_HMB` na Vercel).
+
+### Segredo — NÃO vai no código
+Diferente do HCN (que tem o segredo hardcoded no arquivo, versionado — ver
+"Segurança" abaixo), o `Code_HMB.gs` lê de **Propriedades do script**:
+
+1. Gere um segredo novo, **diferente do HCN**: `openssl rand -hex 32`.
+2. Projeto (engrenagem) > **Configurações do projeto** > **Propriedades do
+   script** > Adicionar:
+   - `SHARED_SECRET` = o segredo gerado
+   - `CRON_CHECK_URL` = `https://<dominio-de-producao>/api/cron-check?hospital=hmb`
+   (ou rode a função `setup()` uma vez com os valores preenchidos e depois
+   limpe — os valores ficam salvos no projeto de qualquer forma).
+
+### Deploy e gatilho
+Iguais aos passos 3 e 4 do HCN (Web App, executar como "Eu", acesso
+"Qualquer pessoa"; gatilho de tempo em `pingCronCheck` a cada 15 min).
+Copie a URL `/exec` gerada.
+
+### Env vars na Vercel (sufixo `_HMB`)
+- `SHEETS_WEBAPP_URL_HMB` = a URL `/exec` do passo acima
+- `CRON_SECRET_HMB` = o **mesmo** `SHARED_SECRET` do HMB
+- `ALERT_PHONE_NUMBERS_HMB` = destinatários do HMB (diferentes do HCN)
+- `ALERT_WHATSAPP_FROM_HMB` = normalmente igual ao `ALERT_WHATSAPP_FROM`
+  (decidido: mesmo número/template, só destinatários diferentes)
+
+---
+
+## Segurança — `SHARED_SECRET` do HCN está exposto
+
+O `Code.gs` do HCN tem `SHARED_SECRET = 'f3f5354aed…'` **hardcoded e
+versionado** (`DevMyFlux/AlertaHosp`, desde o commit `461463d`). É o mesmo
+valor que `CRON_SECRET` na Vercel. Quem tiver acesso ao repositório
+consegue: disparar `/api/cron-check` (spam de SMS/WhatsApp) e ler/escrever a
+aba `EstadoAlertas`.
+
+**Recomendado (fora do escopo desta rodada — HCN não foi tocado):**
+1. Gerar `CRON_SECRET` novo. 2. Atualizar na Vercel. 3. Editar o `Code.gs`
+do HCN pra ler de `PropertiesService` (igual ao `Code_HMB.gs`) em vez de
+hardcoded. 4. Nova versão da implantação. 5. Opcional: dois segredos
+separados (um cron-check, um sheets-bridge).

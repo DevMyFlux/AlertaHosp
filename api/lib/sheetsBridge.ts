@@ -1,15 +1,34 @@
-// Ponte com a aba "EstadoAlertas" da planilha de telemetria, via um Web App
-// do Google Apps Script preso à própria planilha (Extensões > Apps Script)
-// — ver apps-script/Code.gs. Escolhido no lugar de uma Service Account +
-// Google Sheets API (OAuth) porque o Apps Script não exige Google Cloud
-// Console, chave JSON nem passo de compartilhamento: o script já roda como
-// o dono da planilha. O mesmo Web App também tem o gatilho de tempo que
-// chama /api/cron-check a cada 15 min, substituindo a necessidade de um
-// pinger externo (cron-job.org) no plano Free da Vercel.
-const WEBAPP_URL = process.env.SHEETS_WEBAPP_URL;
-const SHARED_SECRET = process.env.CRON_SECRET;
+// Ponte com a aba "EstadoAlertas" de uma planilha de estado de alertas, via
+// um Web App do Google Apps Script preso à própria planilha (Extensões >
+// Apps Script) — ver apps-script/Code.gs (HCN) e apps-script/Code_HMB.gs
+// (HMB). Escolhido no lugar de uma Service Account + Google Sheets API
+// (OAuth) porque o Apps Script não exige Google Cloud Console, chave JSON
+// nem passo de compartilhamento: o script já roda como o dono da planilha.
+//
+// Multi-hospital: cada hospital tem a SUA planilha de estado, o SEU Web App
+// e o SEU segredo. As funções abaixo aceitam um `SheetsBridgeConfig`
+// opcional; quando omitido, caem na configuração do hospital atual (HCN),
+// lida das env vars SHEETS_WEBAPP_URL / CRON_SECRET — exatamente o
+// comportamento anterior, então nenhum chamador que não passa config muda.
+export interface SheetsBridgeConfig {
+  /** URL do Web App do Apps Script (termina em /exec). */
+  webappUrl: string;
+  /** Segredo compartilhado com esse Apps Script (querystring `secret`). */
+  secret: string;
+}
 
-export const sheetsConfigured = Boolean(WEBAPP_URL && SHARED_SECRET);
+/** Config do hospital atual (HCN) a partir das env vars históricas. `null`
+ *  quando não configurado — mantém a semântica de `sheetsConfigured`. */
+export function defaultSheetsBridgeConfig(): SheetsBridgeConfig | null {
+  const webappUrl = process.env.SHEETS_WEBAPP_URL;
+  const secret = process.env.CRON_SECRET;
+  return webappUrl && secret ? { webappUrl, secret } : null;
+}
+
+// Mantido com o mesmo nome e sentido de antes: "o hospital atual tem a ponte
+// de planilha configurada?". Quem precisa saber de outro hospital resolve
+// via defaultSheetsBridgeConfig()/config próprio.
+export const sheetsConfigured = Boolean(defaultSheetsBridgeConfig());
 
 export interface RemoteRow {
   sectorKey: string;
@@ -20,8 +39,8 @@ export interface RemoteRow {
   custoGeradoBRL: number;
 }
 
-async function callGet(): Promise<RemoteRow[]> {
-  const url = `${WEBAPP_URL}?secret=${encodeURIComponent(SHARED_SECRET!)}&action=list`;
+async function callGet(cfg: SheetsBridgeConfig): Promise<RemoteRow[]> {
+  const url = `${cfg.webappUrl}?secret=${encodeURIComponent(cfg.secret)}&action=list`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Apps Script Web App HTTP ${res.status}: ${await res.text()}`);
   const data = (await res.json()) as { rows?: RemoteRow[]; error?: string };
@@ -29,8 +48,8 @@ async function callGet(): Promise<RemoteRow[]> {
   return data.rows || [];
 }
 
-async function callPost(body: unknown): Promise<void> {
-  const url = `${WEBAPP_URL}?secret=${encodeURIComponent(SHARED_SECRET!)}`;
+async function callPost(cfg: SheetsBridgeConfig, body: unknown): Promise<void> {
+  const url = `${cfg.webappUrl}?secret=${encodeURIComponent(cfg.secret)}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -41,22 +60,28 @@ async function callPost(body: unknown): Promise<void> {
   if (data.error) throw new Error(`Apps Script Web App: ${data.error}`);
 }
 
-export async function getRows(): Promise<RemoteRow[]> {
-  if (!sheetsConfigured) return [];
-  return callGet();
+export async function getRows(
+  cfg: SheetsBridgeConfig | null = defaultSheetsBridgeConfig()
+): Promise<RemoteRow[]> {
+  if (!cfg) return [];
+  return callGet(cfg);
 }
 
 export async function appendRow(
   sectorKey: string,
   band: string,
   excedenteKwh: number,
-  custoGeradoBRL: number
+  custoGeradoBRL: number,
+  cfg: SheetsBridgeConfig | null = defaultSheetsBridgeConfig()
 ): Promise<void> {
-  if (!sheetsConfigured) return;
-  await callPost({ action: 'append', sectorKey, band, excedenteKwh, custoGeradoBRL });
+  if (!cfg) return;
+  await callPost(cfg, { action: 'append', sectorKey, band, excedenteKwh, custoGeradoBRL });
 }
 
-export async function resolveSectors(sectorKeys: string[]): Promise<void> {
-  if (!sheetsConfigured || sectorKeys.length === 0) return;
-  await callPost({ action: 'resolve', sectorKeys });
+export async function resolveSectors(
+  sectorKeys: string[],
+  cfg: SheetsBridgeConfig | null = defaultSheetsBridgeConfig()
+): Promise<void> {
+  if (!cfg || sectorKeys.length === 0) return;
+  await callPost(cfg, { action: 'resolve', sectorKeys });
 }

@@ -23,9 +23,12 @@ export function HistoryView({ data }: Props) {
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
 
-  // O histórico remoto (/api/alert-history) ainda atende só o hospital
-  // atual — o backend não foi estendido pra outros hospitais nesta rodada.
-  const remoteHistoryAvailable = hospital.id === 'atual';
+  // O histórico remoto (/api/alert-history) já é multi-hospital no backend
+  // (?hospital=<id>). Depende só de a telemetria do hospital existir — sem
+  // planilha não há como reconstruir os limiares históricos da tabela. Se o
+  // Apps Script daquele hospital ainda não estiver configurado, o endpoint
+  // devolve { rows: [] } e a tela mostra "sem histórico" sem quebrar.
+  const remoteHistoryAvailable = Boolean(hospital.sheetUrl);
 
   useEffect(() => {
     if (!remoteHistoryAvailable) {
@@ -34,7 +37,7 @@ export function HistoryView({ data }: Props) {
       return;
     }
     // Fetch real backend history from Google Sheets
-    fetch('/api/alert-history')
+    fetch(`/api/alert-history?hospital=${encodeURIComponent(hospital.id)}`)
       .then(res => {
         if (!res.ok) {
           throw new Error(`Servidor retornou erro: ${res.status}`);
@@ -318,10 +321,10 @@ export function HistoryView({ data }: Props) {
         <div className="chart-container border border-amber-500/30 bg-amber-950/10 flex items-start gap-3">
           <AlertCircle className="text-amber-500 w-5 h-5 shrink-0 mt-0.5" />
           <div>
-            <div className="text-amber-400 font-semibold text-sm">Histórico automático deste hospital ainda não configurado</div>
+            <div className="text-amber-400 font-semibold text-sm">Histórico de alertas do {hospital.label} ainda não configurado</div>
             <div className="text-gray-400 text-sm mt-1">
-              O backend que grava e consulta o histórico de alertas (planilha "EstadoAlertas" + Apps Script) ainda atende só o Hospital Atual.
-              Assim que a integração do {hospital.label} existir, esta tela passa a mostrar os alertas dele aqui também.
+              O backend já atende este hospital, mas falta a planilha de telemetria do {hospital.label} e o Apps Script da planilha de
+              estado de alertas. Assim que essa integração existir, esta tela passa a mostrar os alertas dele aqui também.
             </div>
           </div>
         </div>

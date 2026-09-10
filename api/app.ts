@@ -2,8 +2,8 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import Papa from "papaparse";
 import { sendAlertNotification } from "./lib/notify.js";
-import { alertStoreConfigured, getActiveSectors, setActiveSectors, getRecentAlerts, recordAlert } from "./lib/serverAlertStore.js";
-import { SHEET_URL } from "../src/config/sheet.js";
+import { getActiveSectors, setActiveSectors, getRecentAlerts, recordAlert } from "./lib/serverAlertStore.js";
+import { resolveHospitalRuntime } from "./lib/hospitalRuntime.js";
 import { processCumulativeData } from "../src/data/processor.js";
 import {
   buildSectorBandStats,
@@ -37,8 +37,18 @@ app.use(express.json());
 
 // API route for WhatsApp / SMS Notifications (disparo manual/pelo frontend)
 app.post("/api/notify", async (req, res) => {
-  const { message, sector, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams } = req.body;
-  const result = await sendAlertNotification({ message, sector, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams });
+  const { message, sector, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams, hospital } = req.body;
+  // Sem quebrar o disparo manual do HCN: quando o frontend manda `phone`
+  // (tela de Configurações sempre manda), ele prevalece; só cai nos
+  // destinatários/remetente do hospital quando não vier nada no corpo.
+  const runtime = resolveHospitalRuntime(hospital);
+  const result = await sendAlertNotification({
+    message, sector, valor,
+    phone: phone || runtime.alertPhones,
+    appId, privateKey,
+    whatsappFrom: whatsappFrom || runtime.alertWhatsappFrom,
+    templateOverride, templateParams,
+  });
   if (result.ok === true) {
     res.json({ success: true, results: result.results });
   } else {
@@ -55,7 +65,14 @@ app.post("/api/notify", async (req, res) => {
 // disparador). Protegido por CRON_SECRET pra não virar endpoint público de
 // disparo de SMS/WhatsApp.
 app.all("/api/cron-check", async (req, res) => {
-  const expectedSecret = process.env.CRON_SECRET;
+  // ?hospital=hcn (default) | hmb | ... — cada hospital tem a sua planilha
+  // de telemetria, o seu Apps Script e o seu segredo. Sem o parâmetro, o
+  // comportamento é idêntico ao anterior (HCN).
+  const runtime = resolveHospitalRuntime(
+    typeof req.query.hospital === 'string' ? req.query.hospital : undefined
+  );
+
+  const expectedSecret = runtime.cronSecret;
   const authHeader = req.headers['authorization'];
   const providedSecret = (typeof authHeader === 'string' && authHeader.replace(/^Bearer\s+/i, ''))
     || (typeof req.query.secret === 'string' ? req.query.secret : undefined);
@@ -65,15 +82,20 @@ app.all("/api/cron-check", async (req, res) => {
     return;
   }
 
-  if (!alertStoreConfigured) {
+  if (!runtime.bridge) {
     res.status(500).json({
-      error: 'SHEETS_WEBAPP_URL/CRON_SECRET não configurados — necessário para o cron não reenviar o mesmo alerta a cada execução. Ver apps-script/README.md.'
+      error: `SHEETS_WEBAPP_URL/CRON_SECRET${runtime.id === 'atual' ? '' : '_' + runtime.id.toUpperCase()} não configurados — necessário para o cron não reenviar o mesmo alerta a cada execução. Ver apps-script/README.md.`
     });
     return;
   }
 
+  if (!runtime.sheetUrl) {
+    res.json({ ok: true, hospital: runtime.id, anomalies: 0, notified: [], message: 'Hospital sem planilha de telemetria configurada' });
+    return;
+  }
+
   try {
-    const csvResponse = await fetch(SHEET_URL);
+    const csvResponse = await fetch(runtime.sheetUrl);
     if (!csvResponse.ok) throw new Error(`Falha ao buscar planilha de telemetria (HTTP ${csvResponse.status})`);
     const csvText = await csvResponse.text();
 
@@ -81,21 +103,21 @@ app.all("/api/cron-check", async (req, res) => {
     const raw = parsedCsv.data as any[];
     if (!raw || raw.length === 0) throw new Error('Planilha sem dados');
 
-    const processed = processCumulativeData(raw);
+    const processed = processCumulativeData(raw, runtime.allSectors);
     if (processed.length === 0) {
-      res.json({ ok: true, anomalies: 0, notified: [], message: 'Sem dados processados' });
+      res.json({ ok: true, hospital: runtime.id, anomalies: 0, notified: [], message: 'Sem dados processados' });
       return;
     }
 
     const last = processed[processed.length - 1];
-    const sStats = buildSectorBandStats(processed);
+    const sStats = buildSectorBandStats(processed, runtime.allSectors);
 
     const [recentAlerts, activeSectors] = await Promise.all([
-      getRecentAlerts(30 * 24),
-      getActiveSectors(),
+      getRecentAlerts(30 * 24, runtime.bridge),
+      getActiveSectors(runtime.bridge),
     ]);
 
-    const anomalies = detectSectorAnomalies(last, sStats, processed, recentAlerts);
+    const anomalies = detectSectorAnomalies(last, sStats, processed, recentAlerts, runtime.sectorMapping, runtime.allSectors);
     const currentSectorKeys = new Set(anomalies.map(a => a.sectorKey));
 
     // Setores que normalizaram (não aparecem mais como anomalia) saem do
@@ -105,8 +127,8 @@ app.all("/api/cron-check", async (req, res) => {
     const notified: string[] = [];
     const failed: { sectorKey: string; error: string }[] = [];
 
-    const phone = process.env.ALERT_PHONE_NUMBERS || undefined;
-    const whatsappFrom = process.env.ALERT_WHATSAPP_FROM || undefined;
+    const phone = runtime.alertPhones || undefined;
+    const whatsappFrom = runtime.alertWhatsappFrom || undefined;
 
     for (const anomaly of anomalies) {
       // Já alertado e a anomalia ainda persiste — evita reenviar a cada
@@ -139,16 +161,16 @@ app.all("/api/cron-check", async (req, res) => {
       if (result.ok === true) {
         stillActive.push(anomaly.sectorKey);
         notified.push(anomaly.sectorKey);
-        await recordAlert(anomaly);
+        await recordAlert(anomaly, runtime.bridge);
       } else {
         failed.push({ sectorKey: anomaly.sectorKey, error: result.error });
         console.warn(`Falha ao notificar automaticamente sobre ${anomaly.sectorName}:`, result.error);
       }
     }
 
-    await setActiveSectors(stillActive);
+    await setActiveSectors(stillActive, runtime.bridge);
 
-    res.json({ ok: true, anomalies: anomalies.length, notified, failed });
+    res.json({ ok: true, hospital: runtime.id, anomalies: anomalies.length, notified, failed });
   } catch (error: any) {
     console.warn("Cron check error:", error?.message || String(error));
     res.status(500).json({ error: error?.message || String(error) });
@@ -157,12 +179,15 @@ app.all("/api/cron-check", async (req, res) => {
 
 app.get("/api/alert-history", async (req, res) => {
   try {
-    if (!alertStoreConfigured) {
+    const runtime = resolveHospitalRuntime(
+      typeof req.query.hospital === 'string' ? req.query.hospital : undefined
+    );
+    if (!runtime.bridge) {
       res.json({ rows: [] });
       return;
     }
     const { getRows } = await import("./lib/sheetsBridge.js");
-    const rows = await getRows();
+    const rows = await getRows(runtime.bridge);
     res.json({ rows });
   } catch (error: any) {
     console.warn("Aviso: Falha ao carregar histórico remoto (Apps Script desconfigurado?). Retornando lista vazia.");

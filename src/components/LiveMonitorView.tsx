@@ -14,10 +14,10 @@ interface Props {
 export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
   const { hospital } = useHospital();
   const [notifying, setNotifying] = useState<Record<string, boolean>>({});
-  // Alertas automáticos ainda atendem só o hospital atual (backend/cron não
-  // foi estendido pra outros hospitais nesta rodada) — evita mandar alerta
-  // do HMB pros destinatários do hospital atual.
-  const notifyDisabled = hospital.id !== 'atual';
+  // Sem planilha de telemetria não há anomalia pra notificar. Com planilha,
+  // o /api/notify?hospital=<id> roteia pros destinatários daquele hospital
+  // (env ALERT_PHONE_NUMBERS_<ID> na Vercel).
+  const notifyDisabled = !hospital.sheetUrl;
 
   const handleNotify = async (alertId: string, anomaly: SectorAnomaly) => {
     if (notifyDisabled) return;
@@ -46,7 +46,7 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
       const response = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom, templateOverride: anomaly.templateOverride, templateParams })
+        body: JSON.stringify({ sector: sectorParam, message, valor, phone, appId, privateKey, whatsappFrom, templateOverride: anomaly.templateOverride, templateParams, hospital: hospital.id })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to send notification");

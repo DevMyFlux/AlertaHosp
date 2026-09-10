@@ -61,6 +61,24 @@ export default function App() {
       setLastUpdate(new Date());
       return;
     }
+    // Planilha configurada mas sem dados / inacessível: só o hospital atual
+    // cai no mock de demonstração. Pros demais (ex: HMB com a aba de
+    // telemetria ainda vazia antes do 1º sync da máquina física), mostra
+    // estado vazio de verdade — mock com nomes de setor de outro hospital
+    // seria enganoso.
+    const onFetchFailure = (reason: string) => {
+      console.warn(reason);
+      if (hospital.id === 'atual') {
+        const mock = generateMockData();
+        setData(processCumulativeData(mock, hospital.allSectors));
+        setIsSimulated(true);
+      } else {
+        setData([]);
+        setIsSimulated(false);
+      }
+      setLastUpdate(new Date());
+    };
+
     fetch(hospital.sheetUrl)
       .then(response => {
         if (!response.ok) throw new Error("Network response was not ok");
@@ -79,27 +97,15 @@ export default function App() {
                 setIsSimulated(false);
                 setLastUpdate(new Date());
               } else {
-                throw new Error("No data found");
+                onFetchFailure("Planilha sem dados ainda.");
               }
-            } catch (error) {
-              console.warn("Parse error:", error);
-              const mock = generateMockData();
-              const processedMock = processCumulativeData(mock, hospital.allSectors);
-              setData(processedMock);
-              setIsSimulated(true);
-              setLastUpdate(new Date());
+            } catch (error: any) {
+              onFetchFailure(`Parse error: ${error?.message || error}`);
             }
           }
         });
       })
-      .catch(err => {
-        console.warn("Fetch error:", err);
-        const mock = generateMockData();
-        const processedMock = processCumulativeData(mock, hospital.allSectors);
-        setData(processedMock);
-        setIsSimulated(true);
-        setLastUpdate(new Date());
-      });
+      .catch(err => onFetchFailure(`Fetch error: ${err?.message || err}`));
   };
 
   // Carrega ao montar, ao trocar de hospital, e refresca a cada 15 minutos
@@ -160,8 +166,8 @@ export default function App() {
             </button>
             <div className="flex items-center">
               <Database className="w-3 h-3 mr-1 text-gray-400" />
-              FONTE: <span className="ml-1" style={{ color: !hospital.sheetUrl ? 'var(--accent-amber)' : isSimulated ? 'var(--accent-amber)' : 'var(--accent-green)' }}>
-                {!hospital.sheetUrl ? 'SEM PLANILHA' : isSimulated ? 'MOCK' : 'CSV'}
+              FONTE: <span className="ml-1" style={{ color: (!hospital.sheetUrl || isSimulated || data.length === 0) ? 'var(--accent-amber)' : 'var(--accent-green)' }}>
+                {!hospital.sheetUrl ? 'SEM PLANILHA' : isSimulated ? 'MOCK' : data.length === 0 ? 'SEM DADOS' : 'CSV'}
               </span>
             </div>
             <div>STATUS: <span className="status-dot status-good"></span>OPERACIONAL</div>

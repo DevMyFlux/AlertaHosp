@@ -1,0 +1,8 @@
+# Segredos e artefatos locais da máquina física do HMB — nunca versionar.
+config.py
+token_hmb.json
+oauth_credenciais_hmb.json
+*.lock
+logs/
+__pycache__/
+*.pyc
