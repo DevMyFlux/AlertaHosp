@@ -3,22 +3,23 @@
 // - "atual" (HCN): totalmente configurado, em produção. Re-exporta as
 //   constantes históricas (SHEET_URL, SECTORS, SECTOR_MAPPING) sem alterar
 //   nenhum valor.
-// - "hmb": setores já preenchidos (descobertos no schema do SQL Server do
-//   HMB — tabela hmb2.dbo.Totalizadores_Disjuntores). Falta só a `sheetUrl`
-//   da planilha de telemetria do HMB, que ainda não existe — assim que ela
-//   for criada e compartilhada (link público de leitura), basta colar a URL
-//   de export CSV em HMB_SHEET_URL abaixo.
+// - "hmb": telemetria na aba "Telemetria" da planilha
+//   1_pkDSva4K9pgqXgTM3jCMdU5cbNDKEVMyzRWIC0Hihc (setores da tabela
+//   hmb2.dbo.Totalizadores_Disjuntores), template WhatsApp próprio, alertas
+//   automáticos ligam quando o gatilho de 15 min do Apps Script do HMB for
+//   criado.
 //
 // Pra ligar/ajustar um hospital, edite só a entrada correspondente aqui —
 // nenhum outro arquivo do frontend precisa mudar (HospitalContext.tsx
 // distribui a entrada ativa pros componentes). O backend espelha esta
 // config em api/lib/hospitalRuntime.ts.
+//
 // Extensões .js explícitas: este módulo é importado tanto pelo frontend
 // (Vite, resolve sem extensão) quanto pelo backend serverless via
 // api/lib/hospitalRuntime.ts (o bundler da Vercel exige a extensão, igual
 // aos outros imports de src/ feitos por api/).
 import { SECTORS, ALL_SECTORS } from '../types.js';
-import { SECTOR_MAPPING, UNIFIED_TEMPLATE_NAME } from '../lib/anomalyDetection.js';
+import { SECTOR_MAPPING } from '../lib/anomalyDetection.js';
 import { SHEET_URL } from './sheet.js';
 
 export interface SectorMappingEntry {
@@ -68,28 +69,34 @@ const HMB_SECTORS = {
 
 // `type` (Infra/Crítico/Imagem/HVAC) alimenta perfil de causa/ação e
 // severidade (ver anomalyDetection.ts). `label` é só rótulo de exibição —
-// ajuste livremente conforme a nomenclatura oficial do HMB. `template`:
-// mesmo template WhatsApp do HCN (decidido: mesmo número/template, só
-// destinatários diferentes).
+// ajuste livremente conforme a nomenclatura oficial do HMB.
+//
+// `template`: template WhatsApp PRÓPRIO do HMB (mesmo número/WABA do HCN,
+// mesma ordem de 9 variáveis, só com cabeçalho "HMB" pra identificar).
+// Aprovado na Meta. O fallback (se este falhar) ainda é o `sistema_de_alerta`
+// compartilhado — ver api/lib/notify.ts; o corpo já leva "HMB - <setor>"
+// via withHospitalPrefix.
+const HMB_TEMPLATE_NAME = 'alerta_consumo_inteligente_hmb_v1';
+
 const HMB_SECTOR_MAPPING: Record<string, SectorMappingEntry> = {
-  'ME_CME_hmb': { label: 'CME', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
-  'ME_LABOR_hmb': { label: 'Laboratório', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
-  'ME_LACTARIO_hmb': { label: 'Lactário', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
-  'ME_AR_COMP_hmb': { label: 'Ar Comprimido', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
-  'ME_VACUO_hmb': { label: 'Vácuo', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
-  'ME_QGBT_EMERGENCIA_hmb': { label: 'QGBT Emergência', type: 'Crítico', template: UNIFIED_TEMPLATE_NAME },
-  'ME_COZINHA_hmb': { label: 'Cozinha', type: 'Infra', template: UNIFIED_TEMPLATE_NAME },
-  'ME_QGBT_E_16_hmb': { label: 'QGBT E-16', type: 'Infra', template: UNIFIED_TEMPLATE_NAME },
-  'ME_QGBT_E_17_hmb': { label: 'QGBT E-17', type: 'Infra', template: UNIFIED_TEMPLATE_NAME },
-  'ME_QGBT_E_18_hmb': { label: 'QGBT E-18', type: 'Infra', template: UNIFIED_TEMPLATE_NAME },
-  'ME_QGBT_E_19_hmb': { label: 'QGBT E-19', type: 'Infra', template: UNIFIED_TEMPLATE_NAME },
-  'ME_QGBT_E_28_hmb': { label: 'QGBT E-28', type: 'Infra', template: UNIFIED_TEMPLATE_NAME },
-  'ME_QGBT_N_30_hmb': { label: 'QGBT N-30', type: 'Infra', template: UNIFIED_TEMPLATE_NAME },
-  'ME_TOMO_hmb': { label: 'Tomografia', type: 'Imagem', template: UNIFIED_TEMPLATE_NAME },
-  'ME_RAIOX01_hmb': { label: 'Raios-X 1', type: 'Imagem', template: UNIFIED_TEMPLATE_NAME },
-  'ME_RAIOX02_hmb': { label: 'Raios-X 2', type: 'Imagem', template: UNIFIED_TEMPLATE_NAME },
-  'ME_CAG01_hmb': { label: 'Central de Água Gelada 1', type: 'HVAC', template: UNIFIED_TEMPLATE_NAME },
-  'ME_CAG02_hmb': { label: 'Central de Água Gelada 2', type: 'HVAC', template: UNIFIED_TEMPLATE_NAME },
+  'ME_CME_hmb': { label: 'CME', type: 'Crítico', template: HMB_TEMPLATE_NAME },
+  'ME_LABOR_hmb': { label: 'Laboratório', type: 'Crítico', template: HMB_TEMPLATE_NAME },
+  'ME_LACTARIO_hmb': { label: 'Lactário', type: 'Crítico', template: HMB_TEMPLATE_NAME },
+  'ME_AR_COMP_hmb': { label: 'Ar Comprimido', type: 'Crítico', template: HMB_TEMPLATE_NAME },
+  'ME_VACUO_hmb': { label: 'Vácuo', type: 'Crítico', template: HMB_TEMPLATE_NAME },
+  'ME_QGBT_EMERGENCIA_hmb': { label: 'QGBT Emergência', type: 'Crítico', template: HMB_TEMPLATE_NAME },
+  'ME_COZINHA_hmb': { label: 'Cozinha', type: 'Infra', template: HMB_TEMPLATE_NAME },
+  'ME_QGBT_E_16_hmb': { label: 'QGBT E-16', type: 'Infra', template: HMB_TEMPLATE_NAME },
+  'ME_QGBT_E_17_hmb': { label: 'QGBT E-17', type: 'Infra', template: HMB_TEMPLATE_NAME },
+  'ME_QGBT_E_18_hmb': { label: 'QGBT E-18', type: 'Infra', template: HMB_TEMPLATE_NAME },
+  'ME_QGBT_E_19_hmb': { label: 'QGBT E-19', type: 'Infra', template: HMB_TEMPLATE_NAME },
+  'ME_QGBT_E_28_hmb': { label: 'QGBT E-28', type: 'Infra', template: HMB_TEMPLATE_NAME },
+  'ME_QGBT_N_30_hmb': { label: 'QGBT N-30', type: 'Infra', template: HMB_TEMPLATE_NAME },
+  'ME_TOMO_hmb': { label: 'Tomografia', type: 'Imagem', template: HMB_TEMPLATE_NAME },
+  'ME_RAIOX01_hmb': { label: 'Raios-X 1', type: 'Imagem', template: HMB_TEMPLATE_NAME },
+  'ME_RAIOX02_hmb': { label: 'Raios-X 2', type: 'Imagem', template: HMB_TEMPLATE_NAME },
+  'ME_CAG01_hmb': { label: 'Central de Água Gelada 1', type: 'HVAC', template: HMB_TEMPLATE_NAME },
+  'ME_CAG02_hmb': { label: 'Central de Água Gelada 2', type: 'HVAC', template: HMB_TEMPLATE_NAME },
 };
 
 const HMB_ALL_SECTORS = [...HMB_SECTORS.INFRA, ...HMB_SECTORS.IMAGING, ...HMB_SECTORS.HVAC];
