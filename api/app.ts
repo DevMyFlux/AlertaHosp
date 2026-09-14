@@ -49,6 +49,9 @@ app.post("/api/notify", async (req, res) => {
     appId, privateKey,
     whatsappFrom: whatsappFrom || runtime.alertWhatsappFrom,
     templateOverride, templateParams,
+    // Namespace sempre resolvido pelo servidor a partir do hospital — não
+    // é algo que o frontend deveria escolher (é config de WABA, não de UI).
+    templateNamespace: runtime.whatsappTemplateNamespace,
   });
   if (result.ok === true) {
     res.json({ success: true, results: result.results });
@@ -160,6 +163,7 @@ app.all("/api/cron-check", async (req, res) => {
       const result = await sendAlertNotification({
         sector: sectorParam, message, valor, phone, whatsappFrom,
         templateOverride: anomaly.templateOverride, templateParams,
+        templateNamespace: runtime.whatsappTemplateNamespace,
       });
 
       if (result.ok === true) {

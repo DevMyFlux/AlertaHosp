@@ -52,6 +52,13 @@ export interface SendAlertParams {
   whatsappFrom?: string;
   templateOverride?: string;
   templateParams?: unknown[];
+  /** Namespace da WABA (WhatsApp Business Account) onde o template está
+   *  aprovado. Cada hospital pode ter seu próprio número/WABA/namespace
+   *  (ver api/lib/hospitalRuntime.ts) — sem isso, um hospital com WABA
+   *  diferente do HCN tenta enviar no namespace errado e o template nunca
+   *  é encontrado (cai direto pro fallback/SMS). Omitido = comportamento
+   *  anterior (env global / namespace do HCN). */
+  templateNamespace?: string;
 }
 
 export interface SendAlertResultEntry {
@@ -73,7 +80,7 @@ export type SendAlertResult =
 // qualquer navegador estar aberto) — extraída de api/app.ts pra não haver
 // duas implementações divergindo com o tempo.
 export async function sendAlertNotification(params: SendAlertParams): Promise<SendAlertResult> {
-  const { message, sector, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams } = params;
+  const { message, sector, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams, templateNamespace: templateNamespaceParam } = params;
   const to = phone || '5511949102183'; // Default se não for enviado
   const from = whatsappFrom || '556298792013'; // Sender for WhatsApp
 
@@ -103,7 +110,15 @@ export async function sendAlertNotification(params: SendAlertParams): Promise<Se
   // Template pré-aprovado, referenciado como "namespace:nome_do_template"
   // (a WABA vinculada ao número já tem o template "sistema_de_alerta"
   // aprovado e em uso pelo sistema legado em Java).
-  const templateNamespace = process.env.VONAGE_WHATSAPP_TEMPLATE_NAMESPACE || '678e6487_99c4_4e6d_995c_3dab76a2438b';
+  //
+  // O namespace é por WABA (Business Account), não por app Vonage — cada
+  // número/hospital pode estar numa WABA diferente com namespace diferente
+  // (ver templateNamespace em SendAlertParams / hospitalRuntime.ts). Sem
+  // `templateNamespaceParam`, cai no comportamento de sempre (env global,
+  // depois o namespace hardcoded do HCN).
+  const templateNamespace = templateNamespaceParam
+    || process.env.VONAGE_WHATSAPP_TEMPLATE_NAMESPACE
+    || '678e6487_99c4_4e6d_995c_3dab76a2438b';
   const templateNameOnly = process.env.VONAGE_WHATSAPP_TEMPLATE_NAME || 'sistema_de_alerta';
   const templateName = `${templateNamespace}:${templateNameOnly}`;
   const templateLocale = (process.env.VONAGE_WHATSAPP_TEMPLATE_LOCALE || WhatsAppLanguageCode.PORTUGUESE_BR) as WhatsAppLanguageCode;

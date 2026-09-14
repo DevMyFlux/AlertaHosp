@@ -23,10 +23,17 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
     if (notifyDisabled) return;
     setNotifying(prev => ({ ...prev, [alertId]: true }));
     try {
-      const phone = localStorage.getItem('notify_phone_number') || '5511949102183';
+      // Telefone/remetente salvos em Configurações são específicos do
+      // hospital atual (HCN) — só usados quando é ele. Pros demais
+      // hospitais, manda undefined e deixa o /api/notify resolver pelo
+      // runtime do hospital (ALERT_PHONE_NUMBERS_<ID>/ALERT_WHATSAPP_FROM_<ID>);
+      // um valor sempre-preenchido aqui bloquearia essa resolução (o backend
+      // só cai no runtime quando o campo vem vazio do frontend).
+      const isDefaultHospital = hospital.id === 'atual';
+      const phone = isDefaultHospital ? (localStorage.getItem('notify_phone_number') || '5511949102183') : undefined;
       const appId = localStorage.getItem('vonage_app_id');
       const privateKey = localStorage.getItem('vonage_private_key');
-      const whatsappFrom = localStorage.getItem('vonage_whatsapp_from') || '556298792013';
+      const whatsappFrom = isDefaultHospital ? (localStorage.getItem('vonage_whatsapp_from') || '556298792013') : undefined;
       // Nome do setor com o hospital no texto do alerta (WhatsApp/número
       // compartilhado). Não mexe no que o dashboard mostra nem no logAlert.
       const forAlert = withHospitalPrefix(anomaly, hospital.label, hospital.id === 'atual');

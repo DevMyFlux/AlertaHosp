@@ -41,6 +41,11 @@ export interface HospitalRuntime {
   alertPhones: string | undefined;
   /** Remetente WhatsApp usado pelo cron desse hospital. */
   alertWhatsappFrom: string | undefined;
+  /** Namespace da WABA onde o template desse hospital está aprovado — o
+   *  número/WABA pode ser diferente por hospital, então o namespace
+   *  também pode ser. Omitido = sendAlertNotification cai no comportamento
+   *  antigo (env global / namespace do HCN). */
+  whatsappTemplateNamespace: string | undefined;
 }
 
 function envFor(id: string, base: string): string | undefined {
@@ -65,5 +70,6 @@ export function resolveHospitalRuntime(rawId: string | undefined | null): Hospit
     cronSecret: secret,
     alertPhones: envFor(cfg.id, 'ALERT_PHONE_NUMBERS'),
     alertWhatsappFrom: envFor(cfg.id, 'ALERT_WHATSAPP_FROM'),
+    whatsappTemplateNamespace: envFor(cfg.id, 'VONAGE_WHATSAPP_TEMPLATE_NAMESPACE'),
   };
 }
