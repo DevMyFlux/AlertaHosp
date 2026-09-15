@@ -114,14 +114,14 @@ app.all("/api/cron-check", async (req, res) => {
     }
 
     const last = processed[processed.length - 1];
-    const sStats = buildSectorBandStats(processed, runtime.allSectors);
+    const sStats = buildSectorBandStats(processed, runtime.allSectors, runtime.alertEngineV2);
 
     const [recentAlerts, activeSectors] = await Promise.all([
       getRecentAlerts(30 * 24, runtime.bridge),
       getActiveSectors(runtime.bridge),
     ]);
 
-    const anomalies = detectSectorAnomalies(last, sStats, processed, recentAlerts, runtime.sectorMapping, runtime.allSectors);
+    const anomalies = detectSectorAnomalies(last, sStats, processed, recentAlerts, runtime.sectorMapping, runtime.allSectors, runtime.alertEngineV2);
     const currentSectorKeys = new Set(anomalies.map(a => a.sectorKey));
 
     // Setores que normalizaram (não aparecem mais como anomalia) saem do
@@ -138,7 +138,14 @@ app.all("/api/cron-check", async (req, res) => {
       // Já alertado e a anomalia ainda persiste — evita reenviar a cada
       // execução do cron (equivalente ao alertedSectorsRef do App.tsx, só
       // que persistido no Redis pra sobreviver entre execuções serverless).
-      if (activeSectors.has(anomaly.sectorKey)) continue;
+      //
+      // Motor v2 (runtime.alertEngineV2, hoje só HMB): essa supressão é
+      // desligada de propósito — cada ciclo em que o setor ainda atende ao
+      // critério é um evento novo e relevante, mesmo que o setor já tenha
+      // alertado antes e continue acima do limite (decisão explícita
+      // 2026-09-15, depois de constatar que um setor ficou 9h anômalo sem
+      // gerar nenhuma notificação além da primeira).
+      if (!runtime.alertEngineV2 && activeSectors.has(anomaly.sectorKey)) continue;
 
       // Nome do setor prefixado com o hospital só no texto do alerta (o
       // WhatsApp é compartilhado — chega como "Alerta HCN" pros dois).
@@ -169,7 +176,7 @@ app.all("/api/cron-check", async (req, res) => {
       if (result.ok === true) {
         stillActive.push(anomaly.sectorKey);
         notified.push(anomaly.sectorKey);
-        await recordAlert(anomaly, runtime.bridge);
+        await recordAlert(anomaly, runtime.bridge, { selfClose: runtime.alertEngineV2 });
       } else {
         failed.push({ sectorKey: anomaly.sectorKey, error: result.error });
         console.warn(`Falha ao notificar automaticamente sobre ${anomaly.sectorName}:`, result.error);

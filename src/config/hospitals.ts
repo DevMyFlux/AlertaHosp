@@ -38,6 +38,18 @@ export interface HospitalConfig {
   sectors: { INFRA: string[]; IMAGING: string[]; HVAC: string[] };
   allSectors: string[];
   sectorMapping: Record<string, SectorMappingEntry>;
+  /** Motor de detecção/disparo v2 (opt-in por hospital, default false =
+   *  comportamento de sempre). Quando true:
+   *   1. Bandas de horário estendidas (Madrugada/Tarde/Noite em vez do
+   *      balde único "Demais Horários") — baseline mais preciso, calibrado
+   *      com telemetria real (ver anomalyDetection.ts, TimeBand).
+   *   2. Sem supressão de alerta repetido — cada ciclo em que o setor
+   *      continua acima do limite gera notificação + registro novos (não
+   *      só o primeiro). Ver api/app.ts, loop do cron.
+   *  Não aplicado ao hospital atual (HCN) nesta rodada — decisão explícita
+   *  de validar primeiro no HMB antes de mudar o comportamento em produção
+   *  do HCN (2026-09-15). */
+  alertEngineV2?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -117,6 +129,7 @@ export const HOSPITALS: HospitalConfig[] = [
     sectors: HMB_SECTORS,
     allSectors: HMB_ALL_SECTORS,
     sectorMapping: HMB_SECTOR_MAPPING,
+    alertEngineV2: true,
   },
 ];
 

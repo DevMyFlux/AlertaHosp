@@ -86,8 +86,8 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
 
     // Mesma base estatística (por setor e turno) usada no Relatório de
     // Diagnóstico da IA, aplicada apenas ao último registro de 15 minutos.
-    const sStats = buildSectorBandStats(data, hospital.allSectors);
-    const alerts = detectSectorAnomalies(last, sStats, data, undefined, hospital.sectorMapping, hospital.allSectors);
+    const sStats = buildSectorBandStats(data, hospital.allSectors, hospital.alertEngineV2);
+    const alerts = detectSectorAnomalies(last, sStats, data, undefined, hospital.sectorMapping, hospital.allSectors, hospital.alertEngineV2);
     alerts.sort((a, b) => b.deviation - a.deviation);
 
     const total = Number(last.Total_Consumption || 0);

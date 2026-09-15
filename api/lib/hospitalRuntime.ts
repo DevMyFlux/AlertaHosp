@@ -46,6 +46,10 @@ export interface HospitalRuntime {
    *  também pode ser. Omitido = sendAlertNotification cai no comportamento
    *  antigo (env global / namespace do HCN). */
   whatsappTemplateNamespace: string | undefined;
+  /** Motor de detecção/disparo v2 (bandas estendidas + sem supressão de
+   *  alerta repetido) — ver HospitalConfig.alertEngineV2 em
+   *  src/config/hospitals.ts. Falso pro hospital atual (HCN). */
+  alertEngineV2: boolean;
 }
 
 function envFor(id: string, base: string): string | undefined {
@@ -71,5 +75,6 @@ export function resolveHospitalRuntime(rawId: string | undefined | null): Hospit
     alertPhones: envFor(cfg.id, 'ALERT_PHONE_NUMBERS'),
     alertWhatsappFrom: envFor(cfg.id, 'ALERT_WHATSAPP_FROM'),
     whatsappTemplateNamespace: envFor(cfg.id, 'VONAGE_WHATSAPP_TEMPLATE_NAMESPACE'),
+    alertEngineV2: Boolean(cfg.alertEngineV2),
   };
 }

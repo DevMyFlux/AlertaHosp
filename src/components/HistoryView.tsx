@@ -47,8 +47,11 @@ export function HistoryView({ data }: Props) {
       .then(json => {
         if (!json || !json.rows) return;
 
-        // sStats for historical threshold reconstruction
-        const sStats = buildSectorBandStats(data, hospital.allSectors);
+        // sStats for historical threshold reconstruction (fallback — só usado
+        // quando a linha não tem consumoMedido/consumoReferencia persistidos,
+        // ver motor v2 abaixo). Precisa da mesma flag de bandas usada na
+        // gravação, senão a banda de r.band não bate com nenhuma chave aqui.
+        const sStats = buildSectorBandStats(data, hospital.allSectors, hospital.alertEngineV2);
         const marginPct = getAlertMarginPct();
 
         const reconstructed: LoggedAlert[] = json.rows.map((r: any) => {
@@ -76,13 +79,27 @@ export function HistoryView({ data }: Props) {
 
           // Excedente/custo já vêm exatos do histórico persistido (gravados no
           // momento real do alerta, junto com a mensagem enviada) — não
-          // recalcular. Só a telemetria bruta é usada aqui, e só pra contexto
-          // informativo (consumo/padrão do instante mais próximo), já que esses
-          // dois campos não são persistidos e por isso continuam aproximados.
+          // recalcular.
           const excedenteKwh = Number(r.excedenteKwh) || 0;
           const custoEstimadoBRL = Number(r.custoGeradoBRL) || 0;
 
-          if (closestPoint) {
+          // Motor v2 (ver Code_HMB.gs): consumo medido/referência/percentual
+          // já vêm exatos, persistidos no instante real do alerta — usa
+          // direto, sem aproximar. Linhas antigas (HCN, ou HMB antes dessa
+          // mudança) não têm esses campos (vêm 0) — cai na reconstrução por
+          // telemetria mais próxima, como sempre foi.
+          const consumoMedidoPersistido = Number(r.consumoMedido) || 0;
+          const consumoReferenciaPersistido = Number(r.consumoReferencia) || 0;
+          const percentualPersistido = Number(r.percentualExcedente) || 0;
+          const temDadoPersistido = consumoMedidoPersistido > 0 && consumoReferenciaPersistido > 0;
+
+          if (temDadoPersistido) {
+            val = consumoMedidoPersistido;
+            expectedMax = consumoReferenciaPersistido * (1 + marginPct / 100);
+            if (val > expectedMax) {
+              projecaoMensalBRL = calcFinancialImpact(val, consumoReferenciaPersistido, r.band).projecaoMensalBRL;
+            }
+          } else if (closestPoint) {
             val = Number(closestPoint[r.sectorKey]) || 0;
             const stat = sStats[r.sectorKey]?.[r.band];
             if (stat) {
@@ -102,9 +119,9 @@ export function HistoryView({ data }: Props) {
             val,
             mean: 0,
             std: 0,
-            deviation: 0,
+            deviation: temDadoPersistido ? percentualPersistido : 0,
             expectedMax,
-            centralValue: 0,
+            centralValue: temDadoPersistido ? consumoReferenciaPersistido : 0,
             representativeMetric: 'mean',
             crossValidated: false,
             severity: 'Crítico',

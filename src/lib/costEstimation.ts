@@ -53,6 +53,11 @@ export const BAND_DURATION_HOURS: Record<string, number> = {
   'Almoço (10-14h)': 4,
   'Jantar (18-22h)': 4,
   'Demais Horários': 13,
+  // Bandas estendidas (motor v2 — ver TimeBand em anomalyDetection.ts):
+  // sub-divisão de "Demais Horários" em madrugada/tarde/noite.
+  'Madrugada (00-07h)': 7,
+  'Tarde (14-18h)': 4,
+  'Noite (22-24h)': 2,
 };
 
 const INTERVALS_PER_HOUR = 4; // leituras de 15 em 15 minutos

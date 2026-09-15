@@ -37,6 +37,14 @@ export interface RemoteRow {
   resolvedAt: string;
   excedenteKwh: number;
   custoGeradoBRL: number;
+  /** Consumo medido no intervalo (kWh) — só presente em hospitais no motor
+   *  v2 (ver alertEngineV2); ausente em linhas antigas/do HCN = 0. */
+  consumoMedido?: number;
+  /** Consumo de referência (padrão esperado, métrica auto-selecionada) usado
+   *  na comparação — motor v2 apenas. */
+  consumoReferencia?: number;
+  /** Percentual acima do padrão esperado — motor v2 apenas. */
+  percentualExcedente?: number;
 }
 
 async function callGet(cfg: SheetsBridgeConfig): Promise<RemoteRow[]> {
@@ -67,15 +75,27 @@ export async function getRows(
   return callGet(cfg);
 }
 
+export interface AppendRowParams {
+  sectorKey: string;
+  band: string;
+  excedenteKwh: number;
+  custoGeradoBRL: number;
+  consumoMedido?: number;
+  consumoReferencia?: number;
+  percentualExcedente?: number;
+  /** true = motor v2 (ver alertEngineV2): a linha já nasce "resolvida" (é um
+   *  registro de ocorrência pontual, não um incidente em aberto aguardando
+   *  voltar ao normal) — ver apps-script/Code_HMB.gs. Ignorado pelo Code.gs
+   *  do HCN, que não lê esse campo e mantém o comportamento de sempre. */
+  selfClose?: boolean;
+}
+
 export async function appendRow(
-  sectorKey: string,
-  band: string,
-  excedenteKwh: number,
-  custoGeradoBRL: number,
+  params: AppendRowParams,
   cfg: SheetsBridgeConfig | null = defaultSheetsBridgeConfig()
 ): Promise<void> {
   if (!cfg) return;
-  await callPost(cfg, { action: 'append', sectorKey, band, excedenteKwh, custoGeradoBRL });
+  await callPost(cfg, { action: 'append', ...params });
 }
 
 export async function resolveSectors(

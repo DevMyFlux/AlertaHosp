@@ -27,7 +27,12 @@ var TAB_NAME = 'EstadoAlertas';
 // excedenteKwh/custoGeradoBRL ficam nas colunas E/F (depois de resolvedAt)
 // de propósito — o "resolve" grava na coluna D por índice fixo
 // (getRange(i+1, 4)), então nada pode entrar entre band e resolvedAt.
-var HEADER = ['sectorKey', 'band', 'loggedAt', 'resolvedAt', 'excedenteKwh', 'custoGeradoBRL'];
+//
+// consumoMedido/consumoReferencia/percentualExcedente (G/H/I, 2026-09-15):
+// motor v2 — cada alerta passa a gravar o consumo real medido, a referência
+// usada na comparação, e o percentual acima dela, além do excedente em
+// kWh/custo que já existiam. Ver api/lib/serverAlertStore.ts.
+var HEADER = ['sectorKey', 'band', 'loggedAt', 'resolvedAt', 'excedenteKwh', 'custoGeradoBRL', 'consumoMedido', 'consumoReferencia', 'percentualExcedente'];
 
 // ── Config via Script Properties (Projeto > Configurações do projeto >
 //    Propriedades do script). Rode setup() uma vez OU preencha na UI. ──
@@ -106,6 +111,9 @@ function doGet(e) {
         resolvedAt: toIso_(r[3]),
         excedenteKwh: Number(r[4]) || 0,
         custoGeradoBRL: Number(r[5]) || 0,
+        consumoMedido: Number(r[6]) || 0,
+        consumoReferencia: Number(r[7]) || 0,
+        percentualExcedente: Number(r[8]) || 0,
       });
     }
     return jsonOutput_({ rows: rows });
@@ -115,8 +123,19 @@ function doGet(e) {
 }
 
 // POST .../exec?secret=...
-//   { action: "append", sectorKey, band, excedenteKwh, custoGeradoBRL }
+//   { action: "append", sectorKey, band, excedenteKwh, custoGeradoBRL,
+//     consumoMedido, consumoReferencia, percentualExcedente, selfClose }
 //   { action: "resolve", sectorKeys: [...] }
+//
+// selfClose=true (motor v2, hoje sempre true nas chamadas do HMB): a linha
+// já nasce com resolvedAt preenchido — é um registro de UMA ocorrência
+// pontual (um ciclo de 15 min que ultrapassou o limite), não mais um
+// "incidente em aberto" esperando o setor voltar ao normal. Isso é o que
+// permite o backend gravar um alerta novo A CADA ciclo em que o setor
+// continuar acima do limite, em vez de só no primeiro (ver runtime do
+// hospital/alertEngineV2 em api/app.ts). Se por acaso existir uma linha
+// antiga ainda aberta desse setor (de antes dessa mudança, ou de uma falha),
+// ela é resolvida automaticamente aqui — não bloqueia o registro novo.
 function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
@@ -133,22 +152,51 @@ function doPost(e) {
     var sheet = getOrCreateTab_();
 
     if (body.action === 'append') {
-      // Dedup: se já existe linha ATIVA (resolvedAt vazio) desse setor, não
-      // abre outra — protege contra duas execuções do cron quase juntas.
-      var values = sheet.getDataRange().getValues();
-      for (var j = 1; j < values.length; j++) {
-        if (values[j][0] === body.sectorKey && !values[j][3]) {
-          return jsonOutput_({ ok: true, deduped: true });
+      var nowIsoAppend = new Date().toISOString();
+
+      if (body.selfClose) {
+        // Motor v2: resolve qualquer linha antiga ainda aberta desse setor
+        // (transição/legado) sem bloquear o registro novo, e grava a nova
+        // linha já como ocorrência fechada (uma por ciclo).
+        var valuesV2 = sheet.getDataRange().getValues();
+        for (var k = 1; k < valuesV2.length; k++) {
+          if (valuesV2[k][0] === body.sectorKey && !valuesV2[k][3]) {
+            sheet.getRange(k + 1, 4).setValue(nowIsoAppend);
+          }
         }
+        sheet.appendRow([
+          body.sectorKey,
+          body.band,
+          nowIsoAppend,
+          nowIsoAppend, // resolvedAt = loggedAt: ocorrência pontual, já fechada
+          Number(body.excedenteKwh) || 0,
+          Number(body.custoGeradoBRL) || 0,
+          Number(body.consumoMedido) || 0,
+          Number(body.consumoReferencia) || 0,
+          Number(body.percentualExcedente) || 0,
+        ]);
+      } else {
+        // Motor clássico (HCN): dedup contra linha já ativa desse setor —
+        // protege contra duas execuções do cron quase juntas enquanto o
+        // setor segue "em incidente aberto" aguardando normalizar.
+        var values = sheet.getDataRange().getValues();
+        for (var j = 1; j < values.length; j++) {
+          if (values[j][0] === body.sectorKey && !values[j][3]) {
+            return jsonOutput_({ ok: true, deduped: true });
+          }
+        }
+        sheet.appendRow([
+          body.sectorKey,
+          body.band,
+          nowIsoAppend,
+          '',
+          Number(body.excedenteKwh) || 0,
+          Number(body.custoGeradoBRL) || 0,
+          Number(body.consumoMedido) || 0,
+          Number(body.consumoReferencia) || 0,
+          Number(body.percentualExcedente) || 0,
+        ]);
       }
-      sheet.appendRow([
-        body.sectorKey,
-        body.band,
-        new Date().toISOString(),
-        '',
-        Number(body.excedenteKwh) || 0,
-        Number(body.custoGeradoBRL) || 0,
-      ]);
     } else if (body.action === 'resolve') {
       var wanted = {};
       (body.sectorKeys || []).forEach(function (k) { wanted[k] = true; });

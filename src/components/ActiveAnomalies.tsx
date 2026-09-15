@@ -29,7 +29,7 @@ export function ActiveAnomalies({ data }: Props) {
     // das demais para o mesmo instante — era uma das três implementações
     // duplicadas encontradas no sistema (as outras eram anomalyDetection.ts
     // e ImagingView.tsx). Unificado aqui.
-    const sStats = buildSectorBandStats(data, hospital.allSectors);
+    const sStats = buildSectorBandStats(data, hospital.allSectors, hospital.alertEngineV2);
 
     const readingsPerHour = 4;
     const elementsToAnalyze = hoursToAnalyze * readingsPerHour;
@@ -42,7 +42,7 @@ export function ActiveAnomalies({ data }: Props) {
       // Últimas leituras até este ponto — usadas pro cálculo de tendência
       // (Etapa 5), sem olhar pro futuro em relação à linha analisada.
       const trendSlice = data.slice(Math.max(0, absoluteIndex - 7), absoluteIndex + 1);
-      activeAlerts.push(...detectSectorAnomalies(row, sStats, trendSlice, undefined, hospital.sectorMapping, hospital.allSectors));
+      activeAlerts.push(...detectSectorAnomalies(row, sStats, trendSlice, undefined, hospital.sectorMapping, hospital.allSectors, hospital.alertEngineV2));
     });
 
     activeAlerts.sort((a, b) => {

@@ -3,13 +3,35 @@ import { analyzeDistribution, DistributionStats, calcTrendSlope, RepresentativeM
 import { calcFinancialImpact, formatBRL, BAND_DURATION_HOURS } from './costEstimation.js';
 import { getAlertLogSince, LoggedAlert } from './alertLog.js';
 
-export type TimeBand = 'Café da Manhã (07-10h)' | 'Almoço (10-14h)' | 'Jantar (18-22h)' | 'Demais Horários';
+export type TimeBand =
+  | 'Café da Manhã (07-10h)' | 'Almoço (10-14h)' | 'Jantar (18-22h)' | 'Demais Horários'
+  // Bandas "estendidas" (motor v2, opt-in por hospital — ver alertEngineV2 em
+  // src/config/hospitals.ts). Sub-dividem "Demais Horários" (13h, madrugada +
+  // tarde + noite misturadas num balde só) em 3 janelas mais estreitas.
+  // Achado analisando telemetria real do HMB: dentro de "Demais Horários" a
+  // mediana de alguns setores varia quase 2× entre a hora mais baixa e a mais
+  // alta (ex: Cozinha do HMB, 2,4kWh de madrugada vs 4,5kWh à tarde) — a média
+  // combinada fica baixa demais pra tarde/noite (gera falso positivo
+  // estrutural) e alta demais pra madrugada (mascara anomalia real). Não
+  // aplicado ao hospital atual (HCN) nesta rodada — ver alertEngineV2.
+  | 'Madrugada (00-07h)' | 'Tarde (14-18h)' | 'Noite (22-24h)';
 
-export function getBand(hour: number): TimeBand {
+export function getBand(hour: number, useExtendedBands = false): TimeBand {
   if (hour >= 7 && hour < 10) return 'Café da Manhã (07-10h)';
   if (hour >= 10 && hour < 14) return 'Almoço (10-14h)';
   if (hour >= 18 && hour < 22) return 'Jantar (18-22h)';
-  return 'Demais Horários';
+  if (!useExtendedBands) return 'Demais Horários';
+  if (hour >= 22 || hour < 0) return 'Noite (22-24h)'; // hour < 0 nunca acontece, mantido só por clareza do intervalo
+  if (hour >= 14 && hour < 18) return 'Tarde (14-18h)';
+  return 'Madrugada (00-07h)'; // 00h-07h (o que sobra)
+}
+
+// As 4 bandas clássicas, sempre usadas (hospital atual / HCN). As 3
+// "estendidas" só entram quando useExtendedBands=true.
+const CLASSIC_BANDS: TimeBand[] = ['Café da Manhã (07-10h)', 'Almoço (10-14h)', 'Jantar (18-22h)', 'Demais Horários'];
+const EXTENDED_BANDS: TimeBand[] = ['Café da Manhã (07-10h)', 'Almoço (10-14h)', 'Jantar (18-22h)', 'Madrugada (00-07h)', 'Tarde (14-18h)', 'Noite (22-24h)'];
+function getAllBands(useExtendedBands: boolean): TimeBand[] {
+  return useExtendedBands ? EXTENDED_BANDS : CLASSIC_BANDS;
 }
 
 // Nome (sem namespace) do template único usado por TODOS os setores. Até a
@@ -106,22 +128,25 @@ const BASELINE_WINDOW = 1000;
 // `allSectors`: opcional, default = ALL_SECTORS do hospital atual — permite
 // rodar a mesma função pra outro hospital (ver src/config/hospitals.ts) sem
 // afetar nenhum chamador existente que não passa esse argumento.
+// `useExtendedBands`: opcional, default false (= comportamento de sempre, 4
+// bandas). true = motor v2 (ver getBand) — hoje só o HMB usa, via
+// hospital.alertEngineV2.
 export function buildSectorBandStats(
   data: ProcessedTelemetryData[],
-  allSectors: string[] = ALL_SECTORS
+  allSectors: string[] = ALL_SECTORS,
+  useExtendedBands = false
 ): Record<string, Record<TimeBand, SectorStats>> {
+  const bands = getAllBands(useExtendedBands);
   const histData: Record<string, Record<TimeBand, number[]>> = {};
   allSectors.forEach(sec => {
-    histData[sec] = {
-      'Café da Manhã (07-10h)': [],
-      'Almoço (10-14h)': [],
-      'Jantar (18-22h)': [],
-      'Demais Horários': [],
-    };
+    histData[sec] = bands.reduce((acc, b) => {
+      acc[b] = [];
+      return acc;
+    }, {} as Record<TimeBand, number[]>);
   });
 
   data.forEach(row => {
-    const band = getBand(row.hour);
+    const band = getBand(row.hour, useExtendedBands);
     allSectors.forEach(sec => {
       const val = Number(row[sec]);
       if (!isNaN(val) && val > 0) {
@@ -544,9 +569,13 @@ export function detectSectorAnomalies(
   // Mesma lógica do `allSectors` de buildSectorBandStats: default = hospital
   // atual, só quem precisa avaliar outro hospital passa explicitamente.
   sectorMapping: typeof SECTOR_MAPPING = SECTOR_MAPPING,
-  allSectors: string[] = ALL_SECTORS
+  allSectors: string[] = ALL_SECTORS,
+  // Mesma flag de buildSectorBandStats — precisa ser a MESMA usada pra
+  // construir `sStats`, senão a banda calculada aqui não bate com as chaves
+  // que existem em sStats (ver hospital.alertEngineV2).
+  useExtendedBands = false
 ): SectorAnomaly[] {
-  const band = getBand(row.hour);
+  const band = getBand(row.hour, useExtendedBands);
   const dateStr = row.timestamp.split(/[T ]/)[0];
   const anomalies: SectorAnomaly[] = [];
   // Lido uma vez por chamada (não por setor) — custo desprezível, evita 20+

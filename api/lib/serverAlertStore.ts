@@ -56,12 +56,28 @@ export async function setActiveSectors(
 // excedente e o custo financeiro daquele evento específico, permitindo
 // somar/consultar por setor sem precisar reconstruir a partir da telemetria
 // bruta.
+//
+// `consumoMedido`/`consumoReferencia`/`percentualExcedente` e `selfClose`
+// são sempre enviados (mesmo pro HCN) — o Code.gs do HCN simplesmente ignora
+// campos que não conhece, então não muda nada lá. Só o Code_HMB.gs (motor
+// v2) de fato grava essas 3 colunas extras e usa `selfClose` pra não abrir
+// um "incidente" em espera — ver apps-script/Code_HMB.gs.
 export async function recordAlert(
-  anomaly: Pick<SectorAnomaly, 'sectorKey' | 'band' | 'excedenteKwh' | 'custoEstimadoBRL'>,
-  cfg: SheetsBridgeConfig | null = defaultSheetsBridgeConfig()
+  anomaly: Pick<SectorAnomaly, 'sectorKey' | 'band' | 'excedenteKwh' | 'custoEstimadoBRL' | 'val' | 'centralValue' | 'deviation'>,
+  cfg: SheetsBridgeConfig | null = defaultSheetsBridgeConfig(),
+  options?: { selfClose?: boolean }
 ): Promise<void> {
   if (!cfg) return;
-  await appendRow(anomaly.sectorKey, anomaly.band, anomaly.excedenteKwh, anomaly.custoEstimadoBRL, cfg);
+  await appendRow({
+    sectorKey: anomaly.sectorKey,
+    band: anomaly.band,
+    excedenteKwh: anomaly.excedenteKwh,
+    custoGeradoBRL: anomaly.custoEstimadoBRL,
+    consumoMedido: anomaly.val,
+    consumoReferencia: anomaly.centralValue,
+    percentualExcedente: anomaly.deviation,
+    selfClose: options?.selfClose,
+  }, cfg);
 }
 
 export async function getRecentAlerts(
