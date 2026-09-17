@@ -230,11 +230,17 @@ function pingCronCheck() {
     return;
   }
   try {
-    UrlFetchApp.fetch(_cronCheckUrl_(), {
+    var url = _cronCheckUrl_();
+    var resp = UrlFetchApp.fetch(url, {
       method: 'get',
       headers: { Authorization: 'Bearer ' + _sharedSecret_() },
       muteHttpExceptions: true,
     });
+    // muteHttpExceptions faz a execução SEMPRE aparecer como "Concluído" em
+    // Execuções, mesmo se a chamada falhar (401, URL errada, 500 etc) — sem
+    // logar, não dava pra saber se o cron-check de verdade rodou. Clique
+    // numa execução de pingCronCheck em Execuções pra ver esta linha.
+    Logger.log('pingCronCheck -> ' + url + ' | status=' + resp.getResponseCode() + ' | body=' + resp.getContentText().slice(0, 300));
   } finally {
     lock.releaseLock();
   }
