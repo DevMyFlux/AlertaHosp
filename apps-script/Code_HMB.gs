@@ -54,15 +54,44 @@ function _cronCheckUrl_() {
 
 /**
  * Rode UMA VEZ pelo editor (selecione setup no dropdown de funções e clique
- * em Executar) pra gravar as propriedades. Depois pode apagar os valores
- * daqui — eles já ficam salvos no projeto. NÃO commite valores reais.
+ * em Executar) pra gravar as propriedades — SÓ depois de preencher os dois
+ * valores abaixo com os reais. NÃO commite valores reais aqui.
+ *
+ * Trava de segurança (2026-09-22): essa função já sobrescreveu o segredo
+ * real duas vezes, por ter sido rodada sem querer (função errada
+ * selecionada no dropdown "Executar") com o texto de exemplo ainda no
+ * lugar — isso derrubou os alertas automáticos do HMB por dias, sem erro
+ * visível (o pingCronCheck usa muteHttpExceptions, então a execução
+ * aparecia "Concluído" mesmo rejeitada). Agora ela recusa rodar se os
+ * valores ainda forem o texto de exemplo, e recusa também sobrescrever uma
+ * propriedade que já existe — pra mudar de verdade, edite direto em
+ * Propriedades do script (Configurações do projeto), não rode esta função.
  */
 function setup() {
+  var SHARED_SECRET_NOVO = 'COLE_UM_SEGREDO_NOVO_AQUI_SO_PARA_RODAR_ESTA_FUNCAO';
+  var CRON_CHECK_URL_NOVO = 'https://SEU-DOMINIO.vercel.app/api/cron-check?hospital=hmb';
+
+  if (SHARED_SECRET_NOVO.indexOf('COLE_') === 0 || CRON_CHECK_URL_NOVO.indexOf('SEU-DOMINIO') !== -1) {
+    throw new Error(
+      'setup() nao rodou: preencha SHARED_SECRET_NOVO/CRON_CHECK_URL_NOVO com ' +
+      'valores reais no codigo antes de executar — ou, mais seguro, edite ' +
+      'direto em Configuracoes do projeto > Propriedades do script, sem ' +
+      'rodar esta funcao.'
+    );
+  }
+  var existentes = _props_().getProperties();
+  if (existentes.SHARED_SECRET || existentes.CRON_CHECK_URL) {
+    throw new Error(
+      'setup() nao rodou: ja existem propriedades salvas (SHARED_SECRET/' +
+      'CRON_CHECK_URL). Pra nao sobrescrever um segredo valido por engano, ' +
+      'edite os valores direto em Configuracoes do projeto > Propriedades ' +
+      'do script em vez de rodar esta funcao de novo.'
+    );
+  }
+
   _props_().setProperties({
-    // Gere um NOVO segredo, diferente do HCN: openssl rand -hex 32
-    SHARED_SECRET: 'COLE_UM_SEGREDO_NOVO_AQUI_SO_PARA_RODAR_ESTA_FUNCAO',
-    // URL de produção do backend + rota + hospital. Confirme o domínio real.
-    CRON_CHECK_URL: 'https://SEU-DOMINIO.vercel.app/api/cron-check?hospital=hmb'
+    SHARED_SECRET: SHARED_SECRET_NOVO,
+    CRON_CHECK_URL: CRON_CHECK_URL_NOVO
   }, false);
 }
 
