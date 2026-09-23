@@ -52,6 +52,7 @@ app.post("/api/notify", async (req, res) => {
     // Namespace sempre resolvido pelo servidor a partir do hospital — não
     // é algo que o frontend deveria escolher (é config de WABA, não de UI).
     templateNamespace: runtime.whatsappTemplateNamespace,
+    smsFallbackEnabled: runtime.smsFallbackEnabled,
   });
   if (result.ok === true) {
     res.json({ success: true, results: result.results });
@@ -171,6 +172,7 @@ app.all("/api/cron-check", async (req, res) => {
         sector: sectorParam, message, valor, phone, whatsappFrom,
         templateOverride: anomaly.templateOverride, templateParams,
         templateNamespace: runtime.whatsappTemplateNamespace,
+        smsFallbackEnabled: runtime.smsFallbackEnabled,
       });
 
       if (result.ok === true) {

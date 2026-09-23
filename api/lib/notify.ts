@@ -59,6 +59,12 @@ export interface SendAlertParams {
    *  é encontrado (cai direto pro fallback/SMS). Omitido = comportamento
    *  anterior (env global / namespace do HCN). */
   templateNamespace?: string;
+  /** false = nunca cair pra SMS quando as duas tentativas de WhatsApp
+   *  falharem — a falha vira erro de verdade (aparece em `failed` no cron)
+   *  em vez de silenciosamente virar SMS. Omitido/true = comportamento
+   *  anterior (fallback SMS habilitado — hospital atual/HCN). Ver
+   *  hospital.smsFallbackEnabled em src/config/hospitals.ts. */
+  smsFallbackEnabled?: boolean;
 }
 
 export interface SendAlertResultEntry {
@@ -80,7 +86,7 @@ export type SendAlertResult =
 // qualquer navegador estar aberto) — extraída de api/app.ts pra não haver
 // duas implementações divergindo com o tempo.
 export async function sendAlertNotification(params: SendAlertParams): Promise<SendAlertResult> {
-  const { message, sector, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams, templateNamespace: templateNamespaceParam } = params;
+  const { message, sector, valor, phone, appId, privateKey, whatsappFrom, templateOverride, templateParams, templateNamespace: templateNamespaceParam, smsFallbackEnabled = true } = params;
   const to = phone || '5511949102183'; // Default se não for enviado
   const from = whatsappFrom || '556298792013'; // Sender for WhatsApp
 
@@ -190,6 +196,19 @@ export async function sendAlertNotification(params: SendAlertParams): Promise<Se
         const genericErrorDetail = `[${templateNameOnly}] ${await extractVonageErrorDetail(wppError)}`;
         whatsappErrorDetail = whatsappErrorDetail ? `${whatsappErrorDetail} | ${genericErrorDetail}` : genericErrorDetail;
         console.warn(`WhatsApp failed for ${targetPhone}, falling back to SMS:`, whatsappErrorDetail);
+      }
+
+      if (!smsFallbackEnabled) {
+        // Hospital com fallback SMS desligado (ver hospital.smsFallbackEnabled
+        // em src/config/hospitals.ts) — as duas tentativas de WhatsApp
+        // falharam e paramos aqui: é um erro de verdade, não cai pra SMS.
+        results.push({
+          phone: targetPhone,
+          status: 'error',
+          error: 'WhatsApp falhou e o fallback SMS está desativado para este hospital.',
+          whatsappError: whatsappErrorDetail,
+        });
+        continue;
       }
 
       try {

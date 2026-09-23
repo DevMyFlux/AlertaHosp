@@ -50,6 +50,11 @@ export interface HospitalConfig {
    *  de validar primeiro no HMB antes de mudar o comportamento em produção
    *  do HCN (2026-09-15). */
   alertEngineV2?: boolean;
+  /** false = nunca cair pra SMS quando o WhatsApp falhar nas 2 tentativas
+   *  (template do hospital + fallback sistema_de_alerta) — vira erro de
+   *  verdade em vez de mandar SMS silenciosamente. Omitido/true = mantém o
+   *  fallback (hospital atual/HCN). */
+  smsFallbackEnabled?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -130,6 +135,7 @@ export const HOSPITALS: HospitalConfig[] = [
     allSectors: HMB_ALL_SECTORS,
     sectorMapping: HMB_SECTOR_MAPPING,
     alertEngineV2: true,
+    smsFallbackEnabled: false,
   },
 ];
 

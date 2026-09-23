@@ -50,6 +50,9 @@ export interface HospitalRuntime {
    *  alerta repetido) — ver HospitalConfig.alertEngineV2 em
    *  src/config/hospitals.ts. Falso pro hospital atual (HCN). */
   alertEngineV2: boolean;
+  /** false = nunca cair pra SMS quando o WhatsApp falhar — ver
+   *  HospitalConfig.smsFallbackEnabled. */
+  smsFallbackEnabled: boolean;
 }
 
 function envFor(id: string, base: string): string | undefined {
@@ -76,5 +79,6 @@ export function resolveHospitalRuntime(rawId: string | undefined | null): Hospit
     alertWhatsappFrom: envFor(cfg.id, 'ALERT_WHATSAPP_FROM'),
     whatsappTemplateNamespace: envFor(cfg.id, 'VONAGE_WHATSAPP_TEMPLATE_NAMESPACE'),
     alertEngineV2: Boolean(cfg.alertEngineV2),
+    smsFallbackEnabled: cfg.smsFallbackEnabled !== false,
   };
 }
