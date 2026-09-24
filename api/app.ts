@@ -131,6 +131,8 @@ app.all("/api/cron-check", async (req, res) => {
 
     const notified: string[] = [];
     const failed: { sectorKey: string; error: string }[] = [];
+    // Alertas que SAÍRAM (WhatsApp entregue à Vonage) mas falharam ao gravar no histórico.
+    const recordFailed: { sectorKey: string; error: string }[] = [];
 
     const phone = runtime.alertPhones || undefined;
     const whatsappFrom = runtime.alertWhatsappFrom || undefined;
@@ -178,16 +180,30 @@ app.all("/api/cron-check", async (req, res) => {
       if (result.ok === true) {
         stillActive.push(anomaly.sectorKey);
         notified.push(anomaly.sectorKey);
-        await recordAlert(anomaly, runtime.bridge, { selfClose: runtime.alertEngineV2 });
+        // A mensagem JÁ foi enviada aqui — uma falha ao gravar na planilha
+        // não pode abortar o ciclo (os demais setores ficariam sem alerta)
+        // nem passar despercebida. Antes, um erro do Apps Script (ex: "busy")
+        // virava exceção → 500, escondendo que o alerta saiu mas não foi
+        // registrado no histórico.
+        try {
+          await recordAlert(anomaly, runtime.bridge, { selfClose: runtime.alertEngineV2 });
+        } catch (recordError: any) {
+          recordFailed.push({ sectorKey: anomaly.sectorKey, error: recordError?.message || String(recordError) });
+          console.warn(`Alerta enviado mas NÃO registrado no histórico (${anomaly.sectorName}):`, recordError?.message || recordError);
+        }
       } else {
         failed.push({ sectorKey: anomaly.sectorKey, error: result.error });
         console.warn(`Falha ao notificar automaticamente sobre ${anomaly.sectorName}:`, result.error);
       }
     }
 
-    await setActiveSectors(stillActive, runtime.bridge);
+    try {
+      await setActiveSectors(stillActive, runtime.bridge);
+    } catch (resolveError: any) {
+      console.warn("Falha ao resolver setores normalizados:", resolveError?.message || resolveError);
+    }
 
-    res.json({ ok: true, hospital: runtime.id, anomalies: anomalies.length, notified, failed });
+    res.json({ ok: true, hospital: runtime.id, anomalies: anomalies.length, notified, failed, recordFailed });
   } catch (error: any) {
     console.warn("Cron check error:", error?.message || String(error));
     res.status(500).json({ error: error?.message || String(error) });

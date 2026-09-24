@@ -11,9 +11,10 @@
 //   1. O segredo NÃO fica no código. Vem de PropertiesService (Script
 //      Properties) — assim não vai pro Git. Chaves: SHARED_SECRET e
 //      CRON_CHECK_URL.
-//   2. LockService no doPost e no pingCronCheck — impede que duas execuções
-//      (ex: gatilho disparando de novo antes da anterior terminar) mexam na
-//      planilha ou disparem o cron ao mesmo tempo.
+//   2. LockService no doPost — impede duas escritas simultâneas na planilha.
+//      O pingCronCheck NÃO usa o lock (deadlock com o doPost que o próprio
+//      cron-check aciona — ver comentário na função); evita pings
+//      sobrepostos com um marcador de cache de validade curta.
 //   3. pingCronCheck chama /api/cron-check?hospital=hmb.
 //
 // Responsabilidades (iguais às do HCN):
@@ -252,12 +253,22 @@ function doPost(e) {
 // Gatilho de tempo (Gatilhos > Adicionar > pingCronCheck > Baseado em tempo
 // > A cada 15 minutos). Dispara o ciclo de alerta do HMB no backend.
 function pingCronCheck() {
-  var lock = LockService.getScriptLock();
-  if (!lock.tryLock(1000)) {
-    // Já tem um ping em andamento (execução anterior travou > 15 min) —
-    // não empilha outro.
+  // NÃO usar LockService.getScriptLock() aqui (2026-09-24). O /api/cron-check
+  // que esta função chama, no meio da execução, volta pra ESTE MESMO Web App
+  // (doPost append/resolve) pra gravar a linha — e o doPost espera o script
+  // lock por até 20s. Segurar o lock durante o fetch = deadlock: o doPost
+  // respondia "busy", o backend já tinha mandado o WhatsApp mas não
+  // conseguia gravar, e o histórico do HMB ficava sem os alertas automáticos
+  // (só as chamadas manuais, sem lock, gravavam). Pra ainda evitar dois
+  // pings sobrepostos, usa um marcador de cache com validade curta — não
+  // disputa lock nenhum com o doPost.
+  var cache = CacheService.getScriptCache();
+  if (cache.get('pingCronCheck_running')) {
+    // Já tem um ping em andamento (a validade do marcador é 120s, bem acima
+    // dos ~10-15s normais do cron-check) — não empilha outro.
     return;
   }
+  cache.put('pingCronCheck_running', '1', 120);
   try {
     var url = _cronCheckUrl_();
     var resp = UrlFetchApp.fetch(url, {
@@ -271,6 +282,6 @@ function pingCronCheck() {
     // numa execução de pingCronCheck em Execuções pra ver esta linha.
     Logger.log('pingCronCheck -> ' + url + ' | status=' + resp.getResponseCode() + ' | body=' + resp.getContentText().slice(0, 300));
   } finally {
-    lock.releaseLock();
+    cache.remove('pingCronCheck_running');
   }
 }
