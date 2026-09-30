@@ -70,7 +70,7 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
       }
       
       // Log the alert to local history view
-      logAlert(anomaly);
+      logAlert(anomaly, hospital.id);
     } catch (e: any) {
       console.warn("Notification error:", e);
       alert(`Erro ao enviar notificação: ${e?.message || e}`);
@@ -98,7 +98,7 @@ export function LiveMonitorView({ data, lastUpdate, onRefresh }: Props) {
   // Registra automaticamente as anomalias ativas no histórico local
   React.useEffect(() => {
     if (alerts && alerts.length > 0) {
-      alerts.forEach(alert => logAlert(alert));
+      alerts.forEach(alert => logAlert(alert, hospital.id));
     }
   }, [alerts]);
 

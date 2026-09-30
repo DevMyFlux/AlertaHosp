@@ -6,6 +6,7 @@ import type { SectorAnomaly } from './anomalyDetection.js';
 
 export interface LoggedAlert extends SectorAnomaly {
   loggedAt: string;
+  hospitalId?: string;
 }
 
 const STORAGE_KEY = 'alert_log';
@@ -33,17 +34,17 @@ function writeLog(entries: LoggedAlert[]): void {
 
 // Registra um alerta detectado no histórico local (por navegador), evitando
 // duplicar a mesma ocorrência (mesmo setor + horário do dado de telemetria).
-export function logAlert(anomaly: SectorAnomaly): void {
+export function logAlert(anomaly: SectorAnomaly, hospitalId = 'atual'): void {
   const entries = readLog();
   const alreadyLogged = entries.some(
-    e => e.sectorKey === anomaly.sectorKey && e.time === anomaly.time && e.date === anomaly.date
+    e => (e.hospitalId || 'atual') === hospitalId && e.sectorKey === anomaly.sectorKey && e.time === anomaly.time && e.date === anomaly.date
   );
   if (alreadyLogged) return;
 
   const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
   const pruned = entries.filter(e => new Date(e.loggedAt).getTime() >= cutoff);
 
-  pruned.push({ ...anomaly, loggedAt: new Date().toISOString() });
+  pruned.push({ ...anomaly, hospitalId, loggedAt: new Date().toISOString() });
   writeLog(pruned.slice(-MAX_ENTRIES));
 }
 

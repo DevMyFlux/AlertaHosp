@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getAlertLog, LoggedAlert } from '../lib/alertLog';
-import { Filter, Search, AlertCircle, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Filter, Search, AlertCircle, FileSpreadsheet, Loader2, FileText, Plus, Pencil, X, Save } from 'lucide-react';
 import { formatBRL, calcFinancialImpact } from '../lib/costEstimation';
 import * as XLSX from 'xlsx';
 import { ProcessedTelemetryData } from '../types';
@@ -11,10 +11,22 @@ interface Props {
   data: ProcessedTelemetryData[];
 }
 
+function readEntries(key: string): LoggedAlert[] {
+  try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; }
+}
+function readEdits(key: string): Record<string, LoggedAlert> {
+  try { const value = JSON.parse(localStorage.getItem(key) || '{}'); return value && typeof value === 'object' ? value : {}; } catch { return {}; }
+}
+function alertId(log: LoggedAlert) { return (log as LoggedAlert & { id?: string }).id || `${log.loggedAt}|${log.sectorKey}`; }
+
 export function HistoryView({ data }: Props) {
   const { hospital } = useHospital();
-  const [localLogs] = useState<LoggedAlert[]>(getAlertLog());
+  const [localLogs, setLocalLogs] = useState<LoggedAlert[]>(getAlertLog());
   const [remoteLogs, setRemoteLogs] = useState<LoggedAlert[]>([]);
+  const [manualLogs, setManualLogs] = useState<LoggedAlert[]>(() => readEntries(`alert_manual_${hospital.id}`));
+  const [edits, setEdits] = useState<Record<string, LoggedAlert>>(() => readEdits(`alert_edits_${hospital.id}`));
+  const [editing, setEditing] = useState<{ id?: string; log?: LoggedAlert } | null>(null);
+  const [form, setForm] = useState({ sectorName: '', loggedAt: '', date: '', time: '', val: '', expectedMax: '', excedenteKwh: '', custoEstimadoBRL: '', severity: 'Atenção' });
   const [loadingRemote, setLoadingRemote] = useState(true);
   const [viewMode, setViewMode] = useState<'resumo' | 'detalhado'>('resumo');
   
@@ -22,6 +34,12 @@ export function HistoryView({ data }: Props) {
   const [daysFilter, setDaysFilter] = useState<number | 'custom'>(30);
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
+
+  useEffect(() => {
+    setLocalLogs(getAlertLog());
+    setManualLogs(readEntries(`alert_manual_${hospital.id}`));
+    setEdits(readEdits(`alert_edits_${hospital.id}`));
+  }, [hospital.id]);
 
   // O histórico remoto (/api/alert-history) já é multi-hospital no backend
   // (?hospital=<id>). Depende só de a telemetria do hospital existir — sem
@@ -142,7 +160,8 @@ export function HistoryView({ data }: Props) {
 
   const allLogs = useMemo(() => {
     // Merge local and remote, deduplicating by sectorKey and timestamp (within 1 hour)
-    const merged = [...localLogs];
+    // Logs locais antigos não tinham hospitalId e pertencem ao hospital padrão.
+    const merged = [...localLogs.filter(log => (log.hospitalId || 'atual') === hospital.id), ...manualLogs];
     
     for (const remote of remoteLogs) {
       const rTime = new Date(remote.loggedAt).getTime();
@@ -155,8 +174,8 @@ export function HistoryView({ data }: Props) {
         merged.push(remote);
       }
     }
-    return merged;
-  }, [localLogs, remoteLogs]);
+    return merged.map(log => edits[alertId(log)] || log);
+  }, [localLogs, remoteLogs, manualLogs, edits, hospital.id]);
 
   const filteredLogs = useMemo(() => {
     let cutoffDate = new Date(0);
@@ -181,7 +200,6 @@ export function HistoryView({ data }: Props) {
 
     return allLogs.filter(log => {
       if (sectorFilter !== 'ALL' && log.sectorName !== sectorFilter) return false;
-      if (log.excedenteKwh <= 0 && log.custoEstimadoBRL <= 0) return false;
       const logDate = new Date(log.loggedAt);
       if (logDate < cutoffDate || logDate > endDate) return false;
       return true;
@@ -261,11 +279,43 @@ export function HistoryView({ data }: Props) {
     
     XLSX.utils.book_append_sheet(workbook, wsSummary, "Resumo por Setor");
     XLSX.utils.book_append_sheet(workbook, wsDetails, "Detalhes dos Alertas");
-    XLSX.writeFile(workbook, "historico_alertas_energia.xlsx");
+    XLSX.writeFile(workbook, `historico_alertas_${hospital.id}.xlsx`);
+  };
+
+  const openEditor = (log?: LoggedAlert) => {
+    setEditing(log ? { id: alertId(log), log } : {});
+    setForm({
+      sectorName: log?.sectorName || '', loggedAt: (log?.loggedAt || new Date().toISOString()).slice(0, 16),
+      date: log?.date || new Date().toISOString().slice(0, 10), time: log?.time || new Date().toTimeString().slice(0, 5),
+      val: String(log?.val ?? ''), expectedMax: String(log?.expectedMax ?? ''), excedenteKwh: String(log?.excedenteKwh ?? ''),
+      custoEstimadoBRL: String(log?.custoEstimadoBRL ?? ''), severity: log?.severity || 'Atenção',
+    });
+  };
+  const saveAlert = (event: React.FormEvent) => {
+    event.preventDefault();
+    const original = editing?.log;
+    const sectorKey = original?.sectorKey || hospital.allSectors.find(key => (hospital.sectorMapping[key]?.label || key) === form.sectorName) || form.sectorName;
+    const updated = {
+      ...(original || { sectorKey, band: 'Demais Horários', mean: 0, std: 0, deviation: 0, centralValue: 0, representativeMetric: 'mean', crossValidated: false, frequenciaHistorica: 0 }),
+      sectorKey, sectorName: form.sectorName, loggedAt: new Date(form.loggedAt).toISOString(), date: form.date, time: form.time,
+      val: Number(form.val) || 0, expectedMax: Number(form.expectedMax) || 0, excedenteKwh: Number(form.excedenteKwh) || 0,
+      custoEstimadoBRL: Number(form.custoEstimadoBRL) || 0, projecaoMensalBRL: original?.projecaoMensalBRL || 0,
+      severity: form.severity, hospitalId: hospital.id,
+      id: editing?.id || `manual-${crypto.randomUUID()}`,
+    } as unknown as LoggedAlert;
+    if (editing?.id) {
+      const next = { ...edits, [editing.id]: updated };
+      setEdits(next); localStorage.setItem(`alert_edits_${hospital.id}`, JSON.stringify(next));
+    } else {
+      const next = [updated, ...manualLogs];
+      setManualLogs(next); localStorage.setItem(`alert_manual_${hospital.id}`, JSON.stringify(next));
+    }
+    setEditing(null);
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 history-print-area">
+      <style>{`@media print { body * { visibility: hidden !important; } .history-print-area, .history-print-area * { visibility: visible !important; } .history-print-area { position: absolute !important; inset: 0 !important; width: 100% !important; background: white !important; color: #111 !important; } .history-print-area .no-print { display: none !important; } .history-print-area .chart-container, .history-print-area table, .history-print-area th, .history-print-area td { background: white !important; color: #111 !important; border-color: #bbb !important; } .history-print-area h2 { color: #111 !important; } }`}</style>
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
@@ -276,7 +326,7 @@ export function HistoryView({ data }: Props) {
             Registro de alertas sincronizados do servidor e locais.
           </p>
         </div>
-        <div className="flex flex-col md:flex-row gap-2">
+        <div className="flex flex-col md:flex-row gap-2 no-print">
           <div className="flex items-center gap-2 bg-[#1A1A1A] border border-[#333] px-3 py-1.5 rounded-md">
             <Filter className="w-4 h-4 text-gray-400" />
             <select
@@ -331,6 +381,8 @@ export function HistoryView({ data }: Props) {
             <FileSpreadsheet className="w-4 h-4" />
             Exportar XLSX
           </button>
+          <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-md border border-blue-500/30 transition-colors text-sm font-medium"><FileText className="w-4 h-4" /> Exportar PDF</button>
+          <button onClick={() => openEditor()} className="flex items-center gap-2 px-3 py-1.5 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 rounded-md border border-violet-500/30 transition-colors text-sm font-medium"><Plus className="w-4 h-4" /> Adicionar alerta</button>
         </div>
       </div>
 
@@ -347,7 +399,7 @@ export function HistoryView({ data }: Props) {
         </div>
       )}
 
-      {remoteHistoryAvailable && (<>
+      {(<>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="chart-container flex items-center justify-between col-span-1">
            <div>
@@ -448,24 +500,25 @@ export function HistoryView({ data }: Props) {
                   <th className="px-4 py-3">Excedente</th>
                   <th className="px-4 py-3">Custo do Evento</th>
                   <th className="px-4 py-3">Severidade</th>
+                  <th className="px-4 py-3 no-print">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#333]">
               {dateRangeError ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-red-400">
+                    <td colSpan={7} className="px-4 py-8 text-center text-red-400">
                     {dateRangeError}
                   </td>
                 </tr>
               ) : loadingRemote && filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500 flex justify-center items-center gap-2">
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500 flex justify-center items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> Sincronizando alertas do servidor...
                   </td>
                 </tr>
               ) : filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                     Nenhum alerta enviado encontrado para os filtros selecionados.
                   </td>
                 </tr>
@@ -482,6 +535,7 @@ export function HistoryView({ data }: Props) {
                         {log.severity.toUpperCase()}
                       </span>
                     </td>
+                    <td className="px-4 py-3 no-print"><button onClick={() => openEditor(log)} title="Editar alerta" className="text-blue-300 hover:text-white"><Pencil className="w-4 h-4" /></button></td>
                   </tr>
                 ))
               )}
@@ -491,6 +545,25 @@ export function HistoryView({ data }: Props) {
         </div>
       </div>
       </>)}
+
+      {editing !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 no-print">
+          <form onSubmit={saveAlert} className="w-full max-w-xl space-y-4 rounded-lg border border-[#444] bg-[#1A1A1A] p-6 shadow-xl">
+            <div className="flex items-center justify-between"><h3 className="text-lg font-semibold text-white">{editing.log ? 'Editar alerta' : 'Adicionar alerta manual'}</h3><button type="button" onClick={() => setEditing(null)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button></div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="text-xs text-gray-400">Setor<select required value={form.sectorName} onChange={e => setForm({ ...form, sectorName: e.target.value })} className="mt-1 w-full rounded border border-[#444] bg-[#222] p-2 text-sm text-white"><option value="">Selecione</option>{hospital.allSectors.map(key => <option key={key} value={hospital.sectorMapping[key]?.label || key}>{hospital.sectorMapping[key]?.label || key}</option>)}{form.sectorName && !hospital.allSectors.some(key => (hospital.sectorMapping[key]?.label || key) === form.sectorName) && <option value={form.sectorName}>{form.sectorName}</option>}</select></label>
+              <label className="text-xs text-gray-400">Severidade<select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value })} className="mt-1 w-full rounded border border-[#444] bg-[#222] p-2 text-sm text-white"><option>Atenção</option><option>Crítico</option></select></label>
+              <label className="text-xs text-gray-400">Data/hora do envio<input required type="datetime-local" value={form.loggedAt} onChange={e => setForm({ ...form, loggedAt: e.target.value })} className="mt-1 w-full rounded border border-[#444] bg-[#222] p-2 text-sm text-white" /></label>
+              <label className="text-xs text-gray-400">Data/hora da anomalia<div className="mt-1 flex gap-2"><input required type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="min-w-0 flex-1 rounded border border-[#444] bg-[#222] p-2 text-sm text-white" /><input required type="time" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} className="min-w-0 flex-1 rounded border border-[#444] bg-[#222] p-2 text-sm text-white" /></div></label>
+              <label className="text-xs text-gray-400">Consumo (kWh)<input type="number" step="any" value={form.val} onChange={e => setForm({ ...form, val: e.target.value })} className="mt-1 w-full rounded border border-[#444] bg-[#222] p-2 text-sm text-white" /></label>
+              <label className="text-xs text-gray-400">Padrão esperado (kWh)<input type="number" step="any" value={form.expectedMax} onChange={e => setForm({ ...form, expectedMax: e.target.value })} className="mt-1 w-full rounded border border-[#444] bg-[#222] p-2 text-sm text-white" /></label>
+              <label className="text-xs text-gray-400">Excedente (kWh)<input type="number" step="any" value={form.excedenteKwh} onChange={e => setForm({ ...form, excedenteKwh: e.target.value })} className="mt-1 w-full rounded border border-[#444] bg-[#222] p-2 text-sm text-white" /></label>
+              <label className="text-xs text-gray-400">Custo (R$)<input type="number" step="any" value={form.custoEstimadoBRL} onChange={e => setForm({ ...form, custoEstimadoBRL: e.target.value })} className="mt-1 w-full rounded border border-[#444] bg-[#222] p-2 text-sm text-white" /></label>
+            </div>
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className="rounded px-4 py-2 text-sm text-gray-300 hover:bg-[#333]">Cancelar</button><button type="submit" className="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"><Save className="h-4 w-4" /> Salvar</button></div>
+          </form>
+        </div>
+      )}
 
     </div>
   );
