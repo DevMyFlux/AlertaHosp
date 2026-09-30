@@ -233,7 +233,7 @@ export default function App() {
           {activeTab === 'hvac' && <HVACView data={data} />}
           {activeTab === 'imaging' && <ImagingView data={data} />}
           {activeTab === 'diagnostics' && <DiagnosticsView data={data} />}
-          {activeTab === 'history' && <HistoryView data={data} />}
+          {activeTab === 'history' && <HistoryView key={hospital.id} data={data} />}
           {activeTab === 'settings' && <SettingsView hiddenTabs={hiddenTabs} toggleTabVisibility={toggleTabVisibility} theme={theme} setTheme={setTheme} />}
       </main>
     </div>

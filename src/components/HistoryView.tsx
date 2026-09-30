@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import { ProcessedTelemetryData } from '../types';
 import { buildSectorBandStats, getAlertMarginPct } from '../lib/anomalyDetection';
 import { useHospital } from '../config/HospitalContext';
+import { HOSPITALS } from '../config/hospitals';
 
 interface Props {
   data: ProcessedTelemetryData[];
@@ -49,11 +50,13 @@ export function HistoryView({ data }: Props) {
   const remoteHistoryAvailable = Boolean(hospital.sheetUrl);
 
   useEffect(() => {
+    let cancelled = false;
     if (!remoteHistoryAvailable) {
       setRemoteLogs([]);
       setLoadingRemote(false);
-      return;
+      return () => { cancelled = true; };
     }
+    setLoadingRemote(true);
     // Fetch real backend history from Google Sheets
     fetch(`/api/alert-history?hospital=${encodeURIComponent(hospital.id)}`)
       .then(res => {
@@ -63,7 +66,14 @@ export function HistoryView({ data }: Props) {
         return res.json();
       })
       .then(json => {
-        if (!json || !json.rows) return;
+        if (cancelled || !json || !Array.isArray(json.rows)) return;
+
+        // Isola a leitura mesmo se a ponte/planilha remota tiver sido
+        // configurada por engano com linhas de outro hospital.
+        const hospitalSectorKeys = new Set(hospital.allSectors.map(key => key.replace(/^\./, '')));
+        const hospitalRows = json.rows.filter((row: any) =>
+          hospitalSectorKeys.has(String(row.sectorKey || '').replace(/^\./, ''))
+        );
 
         // sStats for historical threshold reconstruction (fallback — só usado
         // quando a linha não tem consumoMedido/consumoReferencia persistidos,
@@ -72,7 +82,7 @@ export function HistoryView({ data }: Props) {
         const sStats = buildSectorBandStats(data, hospital.allSectors, hospital.alertEngineV2);
         const marginPct = getAlertMarginPct();
 
-        const reconstructed: LoggedAlert[] = json.rows.map((r: any) => {
+        const reconstructed: LoggedAlert[] = hospitalRows.map((r: any) => {
           const loggedTime = new Date(r.loggedAt).getTime();
           
           // Find closest telemetry data point to the time the alert was logged
@@ -148,24 +158,35 @@ export function HistoryView({ data }: Props) {
             excedenteKwh,
             custoEstimadoBRL,
             projecaoMensalBRL,
-            loggedAt: r.loggedAt
+            loggedAt: r.loggedAt,
+            hospitalId: hospital.id,
           } as unknown as LoggedAlert;
         });
 
-        setRemoteLogs(reconstructed);
+        if (!cancelled) setRemoteLogs(reconstructed);
       })
       .catch(err => console.warn("Aviso (Sincronização): Não foi possível carregar o histórico remoto:", err))
-      .finally(() => setLoadingRemote(false));
+      .finally(() => { if (!cancelled) setLoadingRemote(false); });
+    return () => { cancelled = true; };
   }, [data, remoteHistoryAvailable, hospital.id]);
 
   const allLogs = useMemo(() => {
     // Merge local and remote, deduplicating by sectorKey and timestamp (within 1 hour)
     // Logs locais antigos não tinham hospitalId e pertencem ao hospital padrão.
-    const merged = [...localLogs.filter(log => (log.hospitalId || 'atual') === hospital.id), ...manualLogs];
+    const merged = [...localLogs.filter(log => {
+      if (log.hospitalId) return log.hospitalId === hospital.id;
+      // Migra logicamente registros antigos sem hospitalId pelo identificador
+      // do setor, que é distinto entre HCN e HMB. Setores desconhecidos não
+      // são atribuídos a nenhum hospital para evitar mistura de dados.
+      const normalizedSectorKey = log.sectorKey.replace(/^\./, '');
+      const owner = HOSPITALS.find(candidate => candidate.allSectors.some(key => key.replace(/^\./, '') === normalizedSectorKey));
+      return owner?.id === hospital.id;
+    }), ...manualLogs];
     
     for (const remote of remoteLogs) {
       const rTime = new Date(remote.loggedAt).getTime();
       const isDup = merged.some(m => {
+        if (m.hospitalId && m.hospitalId !== hospital.id) return false;
         if (m.sectorKey !== remote.sectorKey) return false;
         const mTime = new Date(m.loggedAt).getTime();
         return Math.abs(mTime - rTime) < 60 * 60 * 1000; // 1 hour threshold for duplicates
