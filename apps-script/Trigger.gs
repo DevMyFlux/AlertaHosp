@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Gatilho do ciclo de alertas (Apps Script) — V2.
+// Gatilho do ciclo de alertas (Apps Script).
 //
-// Na V2 todo o estado dos alertas fica no PostgreSQL; este script só tem UMA
+// Agora todo o estado dos alertas fica no PostgreSQL; este script só tem UMA
 // função: chamar /api/cron-check a cada 15 minutos. Ele pode ser colado em
 // qualquer planilha (ex.: a de telemetria de cada hospital) e NÃO guarda segredo
 // no código: a URL e o segredo ficam nas Propriedades do script.

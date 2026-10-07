@@ -32,7 +32,7 @@ describe('HCN real — reinício de 24/09/2026', () => {
     assert.ok(worst > 100_000, `V1 geraria um "consumo" de ${Math.round(worst)} kWh em 15 min`);
   });
 
-  test('a normalização V2 nunca grava consumo de intervalo absurdo e detecta o reinício', () => {
+  test('a normalização nunca grava consumo de intervalo absurdo e detecta o reinício', () => {
     const max = Math.max(...loaded.readings.filter(r => r.intervalKwh !== null).map(r => r.intervalKwh as number));
     assert.ok(max < 100, `maior consumo por intervalo: ${max}`);
     const ev = loaded.events.find(e => Math.abs(e.ts.getTime() - EVENT_MS) <= 15 * 60000);
@@ -54,7 +54,7 @@ describe('HCN real — reinício de 24/09/2026', () => {
 
   test('o mesmo período, com o motor V1, teria gerado dezenas de eventos', () => {
     // referência (medida em 07/10/2026 sobre 14 dias): 870 eventos / 40% dos ciclos com alerta.
-    // Aqui só registramos que o V2 está pelo menos uma ordem de grandeza abaixo.
+    // Aqui só registramos que o motor atual está pelo menos uma ordem de grandeza abaixo.
     const result = replayUnit(loaded, { days: 14 });
     assert.ok(result.messages.length < 87);
   });

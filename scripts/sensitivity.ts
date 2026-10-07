@@ -2,7 +2,7 @@
 // precisa ir para virar ATENÇÃO / ALTO / CRÍTICO em cada faixa (dias úteis).
 // Responde "o motor enxerga um problema de X%?" sem precisar esperar um incidente.
 //
-//   npx tsx scripts/sensitivity.ts HMB backups/2026-10-07-pre-v2/hmb_tel.csv [faixa=tarde]
+//   npx tsx scripts/sensitivity.ts HMB backups/2026-10-07-antes-da-atualizacao/hmb_tel.csv [faixa=tarde]
 import { loadUnitFromCsv } from './lib/load.js';
 import { isBaselineEligible } from '../core/telemetry/normalize.js';
 import { buildBaselineSet, pickBaseline, type BaselineContext } from '../core/alerts/baseline.js';

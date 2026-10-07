@@ -1,8 +1,8 @@
-# V2 — Discovery e Auditoria (estado V1, 2026-10-07)
+# Discovery e Auditoria (estado antes da atualização, 2026-10-07)
 
 Base: tag `v1-final` (commit `bf0ab57`). Tudo abaixo foi verificado no código e em
 dados reais de produção (planilhas de telemetria públicas e `/api/alert-history`),
-snapshot em `backups/2026-10-07-pre-v2/` (gitignored).
+snapshot em `backups/2026-10-07-antes-da-atualizacao/` (gitignored).
 
 ## 1. Arquitetura encontrada
 
@@ -55,7 +55,7 @@ Tamanho: ~6.700 linhas, 52 arquivos versionados, **0 testes**.
 | Dia da semana | ignorado |
 | Severidade | >70% Crítico, >30% Alto, senão Moderado — **não influencia** o envio: toda anomalia notifica |
 | Reenvio HCN | enquanto o setor estiver "ativo" na planilha de estado, não reenvia; fecha quando some da lista |
-| Reenvio HMB (v2) | **sem supressão**: todo ciclo de 15 min acima do limite envia WhatsApp novo |
+| Reenvio HMB (flag `alertEngineV2`) | **sem supressão**: todo ciclo de 15 min acima do limite envia WhatsApp novo |
 | Reinicialização da fonte | nenhum tratamento |
 | Fallback | template do hospital → `sistema_de_alerta` → SMS (SMS desligado no HMB) |
 
@@ -83,7 +83,7 @@ O `processor.ts` calcula `194.929 − 0` e o "consumo" de 15 min vira **194.929 
 | | Eventos que o motor dispararia | por dia | ciclos de 15 min com ≥1 alerta |
 |---|---|---|---|
 | HCN (clássico) | 870 | ~62 | 40% |
-| HMB (v2, sem supressão) | **2.756** | **~197** | **94%** |
+| HMB (modo `alertEngineV2`, sem supressão) | **2.756** | **~197** | **94%** |
 
 Causas: margem fixa de 20% (CV natural dos setores é maior), nenhuma persistência, nenhuma
 histerese, sem cooldown no HMB, setores liga/desliga (Central de Água Gelada 1 = 1.248 eventos)
@@ -144,15 +144,15 @@ setor por ciclo (sem agrupamento).
 
 ## 7. Riscos
 
-1. Ligar o V2 sem `DATABASE_URL` derrubaria os alertas → V2 só entra em produção após banco provisionado, backfill e período em *shadow mode* (ver `docs/03-migracao-postgres.md`).
+1. Publicar a atualização sem `DATABASE_URL` derrubaria os alertas → ela só deve entrar em produção após banco provisionado, backfill e período em *shadow mode* (ver `docs/03-migracao-postgres.md`).
 2. Mudança de regra de alerta afeta operação clínica → motor novo precisa de backtest com dados reais (ferramenta `scripts/replay.ts`) e rollout por unidade.
 3. Templates WhatsApp aprovados são fixos (9 variáveis): agrupamento e mensagens de sistema precisam caber neles.
-4. Dados de produção continuam chegando pela planilha até o script Python ser trocado; o V2 precisa ler a planilha *e* o banco durante a transição.
+4. Dados de produção continuam chegando pela planilha até o script Python ser trocado; a versão nova precisa ler a planilha *e* o banco durante a transição.
 
 ## 8. Débitos técnicos
 Sem testes; sem migrations; sem CI; sem logs estruturados; sem lockfile npm (só `bun.lock`); sem validação de entrada nas rotas; config espalhada em 6 lugares; README vazio.
 
-## 9. Proposta arquitetural V2
+## 9. Proposta arquitetural
 
 Princípios: domínio puro e testável (sem `localStorage`/`process.env`/rede), regra de negócio **só no servidor**, uma tabela de verdade (PostgreSQL), unidade (`HCN`/`HMB`) como cidadã de primeira classe em toda camada.
 
@@ -171,7 +171,7 @@ tests/                node:test + tsx; PGlite para testar SQL de verdade
 docs/
 ```
 
-Motor de alertas V2 (detalhe em `docs/02-motor-de-alertas-v2.md`): normalização com *quality gate* → baseline robusto (mediana/MAD, por faixa operacional configurável × tipo de dia) → nível por z-score robusto + piso percentual/absoluto + envelope de percentil → persistência → ciclo de vida (abre, escala, recupera) → política (severidade × cooldown × lembrete × agrupamento) → explicação gravada por evento.
+Motor de alertas (detalhe em `docs/02-motor-de-alertas.md`): normalização com *quality gate* → baseline robusto (mediana/MAD, por faixa operacional configurável × tipo de dia) → nível por z-score robusto + piso percentual/absoluto + envelope de percentil → persistência → ciclo de vida (abre, escala, recupera) → política (severidade × cooldown × lembrete × agrupamento) → explicação gravada por evento.
 
 ## 10. Ordem recomendada de implementação
 1. Backup/branch ✔ → 2. núcleo de domínio + testes (normalização, estatística, motor) → 3. replay com dados reais para calibrar → 4. migrations + repositórios (PGlite) → 5. orquestrador do ciclo + rotas + segurança → 6. migração do legado → 7. relatórios PDF/XLSX → 8. frontend → 9. QA/regressão/performance → 10. limpeza e documentação.

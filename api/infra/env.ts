@@ -111,7 +111,7 @@ export function loadAppEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
     units,
     accessPassword: env.APP_ACCESS_PASSWORD?.trim() || null,
     sessionSecret: env.SESSION_SECRET?.trim() || null,
-    shadowMode: env.V2_SHADOW_MODE === 'true' || env.V2_SHADOW_MODE === '1',
+    shadowMode: env.SHADOW_MODE === 'true' || env.SHADOW_MODE === '1',
     nodeEnv: env.NODE_ENV ?? 'development',
   };
 }

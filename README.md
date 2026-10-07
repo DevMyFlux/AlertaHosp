@@ -21,7 +21,7 @@ máquina do hospital ─► planilha Google ─► /api/cron-check (a cada 15 mi
 | `tests/` | 151 testes (`node:test`), com PostgreSQL real em memória e telemetria real do HCN |
 | `apps-script/` | `Trigger.gs` — só agenda o ciclo (segredo nas Propriedades do script) |
 | `maquina-fisica-hmb/` | ingestão do HMB (Python, roda no hospital) |
-| `docs/` | auditoria da V1, motor V2, migração PostgreSQL, segurança/QA/pendências |
+| `docs/` | auditoria do estado anterior, motor de alertas, migração PostgreSQL, segurança/QA/pendências |
 
 ## Comandos
 ```bash
@@ -38,12 +38,12 @@ npm run recall -- HMB <csv>       # ele ainda enxerga problemas reais? (anomalia
 ```
 
 ## Publicar
-Leia **`docs/03-migracao-postgres.md`** (roteiro com modo sombra e rollback) e **`docs/04-seguranca-qa-e-pendencias.md`**
+Leia **`docs/03-migracao-postgres.md`** (roteiro com modo sombra e volta) e **`docs/04-seguranca-qa-e-pendencias.md`**
 (o que rotacionar e o que ainda depende de você). Variáveis em `.env.example`. Publique por Git — não use `vercel deploy`
 nesta pasta (o link `.vercel/` local aponta para outro projeto).
 
 ## Documentação
-1. [Discovery e auditoria da V1](docs/01-discovery-e-auditoria.md) — como funcionava, o que estava errado, com dados reais
-2. [Motor de alertas V2](docs/02-motor-de-alertas-v2.md) — regras, parâmetros, evidência (V1 × V2), limitações
+1. [Discovery e auditoria do estado anterior](docs/01-discovery-e-auditoria.md) — como funcionava, o que estava errado, com dados reais
+2. [Motor de alertas](docs/02-motor-de-alertas.md) — regras, parâmetros, evidência (antes × agora), limitações
 3. [PostgreSQL e migração](docs/03-migracao-postgres.md)
 4. [Segurança, QA, performance e pendências](docs/04-seguranca-qa-e-pendencias.md)

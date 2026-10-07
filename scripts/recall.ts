@@ -2,7 +2,7 @@
 // +30%/+60%/+100%/+200% numa tarde de dia útil recente e mostra se o motor abre
 // incidente (A=atenção, H=alto, C=crítico) e se notifica (*).
 //
-//   npx tsx scripts/recall.ts HMB backups/2026-10-07-pre-v2/hmb_tel.csv [leituras=8]
+//   npx tsx scripts/recall.ts HMB backups/2026-10-07-antes-da-atualizacao/hmb_tel.csv [leituras=8]
 import { loadUnitFromCsv } from './lib/load.js';
 import { replayUnit, type Injection } from './lib/replay.js';
 import { isUnitCode } from '../core/units.js';

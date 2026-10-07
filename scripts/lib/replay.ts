@@ -1,4 +1,4 @@
-// Backtest do motor V2: reproduz, leitura a leitura, o que o sistema decidiria
+// Backtest do motor de alertas: reproduz, leitura a leitura, o que o sistema decidiria
 // com dados históricos reais — incluindo normalização, baseline em cache
 // (recalculado de tempos em tempos, como em produção), ciclo de vida e política
 // de notificação. Permite calibrar parâmetros com evidência e medir recall com

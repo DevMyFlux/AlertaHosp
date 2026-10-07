@@ -2,7 +2,7 @@
 
 ## Segurança — achados da auditoria e o que foi feito
 
-| # | Achado (V1) | Situação na V2 |
+| # | Achado (V1) | Situação agora |
 |---|---|---|
 | S1 | `POST /api/notify` aberto: qualquer pessoa mandava WhatsApp/SMS para qualquer número com as credenciais da empresa | **Removido.** A única ação que envia mensagem fora do ciclo é o teste administrativo: exige senha configurada **e** sessão, 5 chamadas/10 min, registra auditoria |
 | S2 | `POST /api/chat` aberto (chave Gemini) | **Removido** (e o SDK/`GEMINI_API_KEY`) |
@@ -24,7 +24,7 @@ senha/token/chave/cookie/connection string e telefones mascarados; SQL 100% para
 `npm audit`: restam 2 avisos moderados em `exceljs → uuid` (afetam apenas `uuid` v3/v5/v6 com buffer; `exceljs` usa v4) — não explorável aqui.
 
 ⚠️ **Não faça `vercel deploy` por esta pasta**: `.vercel/project.json` aponta para outro projeto (`alertass_v2`, rootDirectory `Downloads/AlarmeHp`).
-Publique por Git (preview do branch `v2`).
+Publique por Git (push na `main`).
 
 ## QA — cenários pedidos × testes (`npm test`: 151 testes, ~1 min)
 
@@ -58,7 +58,7 @@ qualquer mudança de regra.
 
 ## Performance — medido
 
-| Item | V1 | V2 |
+| Item | Antes | Agora |
 |---|---|---|
 | Bytes baixados por ciclo do cron | 3,4 MB (HCN) / 1,5 MB (HMB), crescendo | ≈ 180 KB (300 linhas via gviz) |
 | JS inicial do navegador | 1.047 KB (320 KB gzip), tudo junto | 218 KB (69 KB gzip) + gráficos 416 KB (120 KB) sob demanda |
@@ -71,7 +71,7 @@ qualquer mudança de regra.
 
 1. **PostgreSQL de produção não foi exercitado**: as credenciais "disponibilizadas separadamente" **não chegaram ao ambiente**.
    Migrations, SQL, ciclo e API foram testados em PostgreSQL real (PGlite 18 em WASM) e o código usa o driver `pg` padrão
-   atrás da mesma interface — mas o primeiro `npm run db:migrate` no servidor real é o teste final. Rode-o em preview, não em produção.
+   atrás da mesma interface — mas o primeiro `npm run db:migrate` no servidor real é o teste final. Rode-o antes de publicar na `main`.
 2. **Mensagens do WhatsApp**: continuam nos templates aprovados (9 variáveis). Mensagens de *sistema* (fonte parada/retomada,
    recuperação) **não** têm template — hoje aparecem no painel e nos logs; para virarem WhatsApp é preciso aprovar um template novo na Meta.
 3. **Ajuste fino das regras com a operação**: os padrões foram calibrados nos dados reais, mas "o que merece WhatsApp" é decisão

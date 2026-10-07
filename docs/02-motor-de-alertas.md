@@ -1,4 +1,4 @@
-# Motor de alertas V2
+# Motor de alertas
 
 Objetivo: **menos mensagens, nenhum problema real escondido, e cada alerta explicável.**
 Todo o motor é código puro e testado em `core/` (sem rede, sem banco, sem relógio global);
@@ -76,7 +76,7 @@ Todos os números acima vivem em `alert_rules` (versionados, por unidade) — na
 
 Backtest de 14 dias (`npm run replay`):
 
-| | Motor V1 | **Motor V2** |
+| | Antes (motor anterior) | **Agora** |
 |---|---|---|
 | HCN — eventos de alerta | 870 (≈ 62/dia, 40% dos ciclos) | 8 incidentes · **2 mensagens** (0,1/dia) |
 | HMB — eventos de alerta | 2.756 (≈ 197/dia, 94% dos ciclos) | 29 incidentes · **14 mensagens** (1,0/dia, máx. 5) |

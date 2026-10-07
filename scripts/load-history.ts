@@ -101,7 +101,7 @@ async function loadUnit(db: Db, unit: UnitCode, csv: string, legacyFile: string 
 }
 
 async function main() {
-  const dir = 'backups/2026-10-07-pre-v2';
+  const dir = 'backups/2026-10-07-antes-da-atualizacao';
   const db = await openDb();
   try {
     if (flag('dev')) {

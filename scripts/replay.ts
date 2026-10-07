@@ -1,6 +1,6 @@
-// Backtest do motor V2 sobre dados reais exportados.
+// Backtest do motor de alertas sobre dados reais exportados.
 //
-//   npx tsx scripts/replay.ts HCN backups/2026-10-07-pre-v2/hcn_tel.csv [dias=14]
+//   npx tsx scripts/replay.ts HCN backups/2026-10-07-antes-da-atualizacao/hcn_tel.csv [dias=14]
 //
 // Imprime volume de incidentes/mensagens por dia e o recall com anomalias injetadas.
 import { loadUnitFromCsv } from './lib/load.js';

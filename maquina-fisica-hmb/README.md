@@ -17,7 +17,7 @@ SQL Server hmb2 ──(alerta_hmb.py)──► API local :5000/energia
 ```
 
 Este pipeline **só alimenta a planilha de telemetria**. Detecção de anomalia
-e disparo de alerta são do backend (motor V2, PostgreSQL); o Apps Script (`apps-script/Trigger.gs`) só agenda o ciclo a cada 15 min.
+e disparo de alerta são do backend (motor de alertas, PostgreSQL); o Apps Script (`apps-script/Trigger.gs`) só agenda o ciclo a cada 15 min.
 
 ---
 

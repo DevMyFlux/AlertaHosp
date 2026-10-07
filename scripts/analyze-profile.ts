@@ -2,7 +2,7 @@
 // e qualidade. Serve para escolher faixas operacionais e parâmetros do motor
 // com base em evidência, não em palpite.
 //
-//   npx tsx scripts/analyze-profile.ts HCN backups/2026-10-07-pre-v2/hcn_tel.csv
+//   npx tsx scripts/analyze-profile.ts HCN backups/2026-10-07-antes-da-atualizacao/hcn_tel.csv
 import { loadUnitFromCsv } from './lib/load.js';
 import { isBaselineEligible } from '../core/telemetry/normalize.js';
 import { localParts, dayTypeOf } from '../core/time.js';
