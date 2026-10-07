@@ -157,7 +157,7 @@ export function clientKey(req: Request): string {
 // --- cabeçalhos e identificação da requisição ------------------------------------------------
 
 export function baseMiddleware(): RequestHandler {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (_req: Request, res: Response, next: NextFunction) => {
     res.locals.requestId = randomUUID().slice(0, 8);
     res.setHeader('X-Request-Id', String(res.locals.requestId));
     res.setHeader('X-Content-Type-Options', 'nosniff');

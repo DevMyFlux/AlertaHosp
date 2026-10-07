@@ -1,6 +1,5 @@
 import { LogOut, Moon, Sun, SunMoon } from 'lucide-react';
 import { UNIT_CODES, UNIT_META, type UnitCode } from '../../core/unitMeta';
-import { api } from '../lib/api';
 import { ago, timeOnly } from '../lib/format';
 import { useRemote } from '../lib/hooks';
 import { href, type PageKey, type Route } from '../lib/router';

@@ -103,7 +103,7 @@ setor por ciclo (sem agrupamento).
 | S8 | `xlsx@0.18.5`: 2 CVEs altas (prototype pollution, ReDoS), sem correção no npm | Média |
 | S9 | `.claude/settings.local.json` (não ignorado pelo git) contém o segredo do HMB | Alta (já ignorado; rotacionar) |
 | S10 | `Downloads/AlarmeHp/` dentro do projeto guarda cópias de `.env` | Baixa |
-| S11 | credenciais SQL `sa/hcnadmin` em texto plano no `alerta.py` do HCN (fora do repo) | Alta (fora do escopo do código) |
+| S11 | login administrador (`sa`) do SQL Server com senha em texto plano no `alerta.py` do HCN (fora do repo) | Alta (fora do escopo do código) |
 
 ### 5.4 Confiabilidade / concorrência
 - Estado do cron = ler planilha → decidir → gravar (sem transação). O `Code.gs` do HCN não tem `LockService`; dois ciclos sobrepostos duplicam alerta. O deadlock `pingCronCheck`×`doPost` do HMB (commit `bf0ab57`) e a sobrescrita do segredo por `setup()` deixaram o histórico do HMB **sem registros automáticos entre 22/09 e 29/09** (3 linhas no dia 22, 69 no dia 29).

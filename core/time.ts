@@ -115,20 +115,6 @@ export function weekdayNamePt(weekday: number): string {
   return WEEKDAY_NAMES_PT[weekday] ?? '';
 }
 
-/** "dd/MM HH:mm" no fuso informado. */
-export function formatLocalShort(date: Date, timeZone: string): string {
-  const p = localParts(date, timeZone);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(p.day)}/${pad(p.month)} ${pad(p.hour)}:${pad(p.minute)}`;
-}
-
-/** "dd/MM/yyyy HH:mm" no fuso informado. */
-export function formatLocalDateTime(date: Date, timeZone: string): string {
-  const p = localParts(date, timeZone);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(p.day)}/${pad(p.month)}/${p.year} ${pad(p.hour)}:${pad(p.minute)}`;
-}
-
 export function minutesBetween(a: Date, b: Date): number {
   return (b.getTime() - a.getTime()) / 60000;
 }

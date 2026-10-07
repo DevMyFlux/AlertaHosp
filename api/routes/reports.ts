@@ -65,7 +65,8 @@ export function reportRoutes(deps: AppDeps): Router {
     const fileName = reportFileName(model, format);
     deps.log.info('report.generated', { units, format, rows: model.sections.map(s => ({ unit: s.unit, alerts: s.totals.alerts })), bytes: body.length, ms: Date.now() - started });
     res.setHeader('Content-Type', format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    // ?inline=1 abre no navegador (pré-visualização) em vez de baixar
+    res.setHeader('Content-Disposition', `${queryString(req, 'inline') === '1' ? 'inline' : 'attachment'}; filename="${fileName}"`);
     res.setHeader('Content-Length', String(body.length));
     res.end(body);
   }));

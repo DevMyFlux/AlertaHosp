@@ -95,16 +95,27 @@ export interface CachedBaselines {
   computedAt: Date;
 }
 
-export async function loadBaselineCache(q: Queryable, sectorId: number): Promise<CachedBaselines | null> {
-  const res = await q.query<{ as_of: Date; rules_version: string; stats: SerializedStats[]; computed_at: Date }>(
-    'SELECT as_of, rules_version, stats, computed_at FROM sector_baselines WHERE sector_id = $1',
-    [sectorId]
-  );
-  const r = res.rows[0];
-  if (!r) return null;
+type BaselineRow = { sector_id?: number; as_of: Date; rules_version: string; stats: SerializedStats[]; computed_at: Date };
+
+function toCached(r: BaselineRow): CachedBaselines {
   const set: BaselineSet = new Map();
   for (const s of r.stats) set.set(`${s.windowKey}:${s.dayType}`, { ...s, from: new Date(s.from), to: new Date(s.to) });
   return { set, asOf: new Date(r.as_of), rulesVersion: r.rules_version, computedAt: new Date(r.computed_at) };
+}
+
+export async function loadBaselineCache(q: Queryable, sectorId: number): Promise<CachedBaselines | null> {
+  const res = await q.query<BaselineRow>('SELECT as_of, rules_version, stats, computed_at FROM sector_baselines WHERE sector_id = $1', [sectorId]);
+  return res.rows[0] ? toCached(res.rows[0]) : null;
+}
+
+/** Baselines de TODOS os setores da unidade numa consulta só (evita N+1 nas telas). */
+export async function loadUnitBaselines(q: Queryable, unitId: number): Promise<Map<number, CachedBaselines>> {
+  const res = await q.query<BaselineRow & { sector_id: number }>(
+    `SELECT b.sector_id, b.as_of, b.rules_version, b.stats, b.computed_at
+       FROM sector_baselines b JOIN sectors s ON s.id = b.sector_id WHERE s.unit_id = $1`,
+    [unitId]
+  );
+  return new Map(res.rows.map(r => [Number(r.sector_id), toCached(r)]));
 }
 
 export async function saveBaselineCache(q: Queryable, sectorId: number, set: BaselineSet, asOf: Date, rulesVersion: string): Promise<void> {

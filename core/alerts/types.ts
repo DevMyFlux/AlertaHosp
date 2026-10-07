@@ -16,13 +16,5 @@ export const SEVERITY_LABEL: Record<Severity, string> = {
   critico: 'Crítico',
 };
 
-export function maxLevel(a: Level, b: Level): Level {
-  return LEVEL_RANK[a] >= LEVEL_RANK[b] ? a : b;
-}
-
-export function isSeverity(level: Level): level is Severity {
-  return level !== 'normal';
-}
-
 /** Dia útil × fim de semana. `all` = a janela vale para qualquer dia. */
 export type WindowDayType = 'weekday' | 'weekend' | 'all';

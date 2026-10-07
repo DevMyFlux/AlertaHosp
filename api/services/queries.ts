@@ -8,7 +8,7 @@ import type { UnitCode } from '../../core/units.js';
 import type { Severity } from '../../core/alerts/types.js';
 import { baselineForInstant, type BaselineContext } from '../../core/alerts/baseline.js';
 import { evaluateValue } from '../../core/alerts/detector.js';
-import { loadBaselineCache, loadUnitState } from '../infra/repos/state.js';
+import { loadBaselineCache, loadUnitBaselines, loadUnitState } from '../infra/repos/state.js';
 import { loadLatestReadings, loadSeries } from '../infra/repos/readings.js';
 
 type Row = Record<string, any>;
@@ -291,6 +291,7 @@ export async function getSectorSnapshots(q: Queryable, cfg: UnitConfig, now: Dat
   );
   const ctx: BaselineContext = { windows: cfg.windows, intervalMin: cfg.expectedIntervalMin, timeZone: cfg.timezone, rules: cfg.rules };
   const staleMs = Math.max(30, cfg.expectedIntervalMin * 3) * 60000;
+  const baselines = await loadUnitBaselines(q, cfg.id);
 
   const out: SectorSnapshot[] = [];
   for (const s of cfg.sectors) {
@@ -313,7 +314,7 @@ export async function getSectorSnapshots(q: Queryable, cfg: UnitConfig, now: Dat
     if (lr.status === 'quarantined') snap.state = 'quarantine';
     else if (lr.intervalKwh === null || (lr.status !== 'ok' && lr.status !== 'gap')) snap.state = 'no_data';
     else {
-      const cache = await loadBaselineCache(q, s.id);
+      const cache = baselines.get(s.id);
       const hit = cache ? baselineForInstant(cache.set, lr.ts, ctx) : null;
       if (!hit?.baseline) snap.state = 'learning';
       else {

@@ -26,11 +26,11 @@ describe('logs estruturados nunca carregam segredos', () => {
 
   test('telefones aparecem mascarados e a linha é JSON válido', () => {
     const lines: string[] = [];
-    createLogger({ log: l => lines.push(l) }).info('notification.sent', { unit: 'HCN', recipient: '5511949102183', phone: '5511986150391' });
+    createLogger({ log: l => lines.push(l) }).info('notification.sent', { unit: 'HCN', recipient: '5511900000001', phone: '5511900000002' });
     const parsed = JSON.parse(lines[0]);
     assert.equal(parsed.event, 'notification.sent');
-    assert.equal(parsed.recipient, '*********2183');
-    assert.ok(!lines[0].includes('5511949102183'));
+    assert.equal(parsed.recipient, '*********0001');
+    assert.ok(!lines[0].includes('5511900000001'));
   });
 
   test('connection string é exibida sem a senha', () => {
@@ -40,8 +40,8 @@ describe('logs estruturados nunca carregam segredos', () => {
 
 describe('configuração por ambiente', () => {
   test('telefones aceitam vírgula, espaço ou ponto-e-vírgula (o HMB já foi salvo com espaço por engano)', () => {
-    const env = loadAppEnv({ ALERT_PHONE_NUMBERS_HMB: '5511949102183 5511986150391;+5511986510453', ALERT_PHONE_NUMBERS: '5511911112222' } as NodeJS.ProcessEnv);
-    assert.deepEqual(env.units.HMB.phones, ['5511949102183', '5511986150391', '5511986510453']);
+    const env = loadAppEnv({ ALERT_PHONE_NUMBERS_HMB: '5511900000001 5511900000002;+5511900000003', ALERT_PHONE_NUMBERS: '5511911112222' } as NodeJS.ProcessEnv);
+    assert.deepEqual(env.units.HMB.phones, ['5511900000001', '5511900000002', '5511900000003']);
     assert.deepEqual(env.units.HCN.phones, ['5511911112222']);
   });
 
@@ -59,7 +59,7 @@ describe('configuração por ambiente', () => {
   });
 
   test('máscara de telefone', () => {
-    assert.equal(maskPhone('5511949102183'), '*********2183');
+    assert.equal(maskPhone('5511900000001'), '*********0001');
   });
 });
 

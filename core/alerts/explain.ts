@@ -4,7 +4,6 @@
 
 import type { Evaluation, LimitBinding, BaselineSnapshot } from './detector.js';
 import { SEVERITY_LABEL, type Level, type Severity } from './types.js';
-import { weekdayNamePt } from '../time.js';
 
 export interface ExplainPayload {
   rule: string;
@@ -74,10 +73,4 @@ export function buildExplain(ev: Evaluation, persistence: { required: number; ob
     persistence,
     reason: describeEvaluation(ev),
   };
-}
-
-/** "quinta-feira, 24/09 às 16:45" a partir de partes locais já calculadas. */
-export function formatWeekdayDateTime(weekday: number, day: number, month: number, hour: number, minute: number): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${weekdayNamePt(weekday)}, ${p(day)}/${p(month)} às ${p(hour)}:${p(minute)}`;
 }

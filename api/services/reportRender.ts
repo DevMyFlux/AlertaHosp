@@ -86,12 +86,12 @@ function addUnitSheets(wb: ExcelJS.Workbook, model: ReportModel, section: Report
       sector: r.sectorName,
       openedAt: excelLocalDate(r.openedAt, tz),
       recoveredAt: r.recoveredAt ? excelLocalDate(r.recoveredAt, tz) : null,
-      duration: r.durationMinutes,
+      duration: r.origin === 'legacy_import' ? null : r.durationMinutes, // o legado registrava um instante, não uma duração
       type: r.alertType,
       severity: r.severityLabel,
       window: r.windowName,
-      peak: r.peakValueKwh,
-      expected: r.baselineKwh,
+      peak: r.peakValueKwh > 0 ? r.peakValueKwh : null, // histórico da V1 não guardava o pico
+      expected: r.baselineKwh > 0 ? r.baselineKwh : null,
       excess: r.totalExcessKwh,
       cost: r.totalCostBrl,
       tariff: r.tariffBrlPerKwh,
@@ -237,11 +237,11 @@ interface PdfColumn {
 const PDF_COLUMNS: PdfColumn[] = [
   { header: 'Início', width: 82, align: 'left', value: (r, tz) => fmtDateTime(r.openedAt, tz) },
   { header: 'Setor', width: 118, align: 'left', value: r => r.sectorName },
-  { header: 'Severidade', width: 62, align: 'left', value: r => r.severityLabel },
+  { header: 'Severidade', width: 62, align: 'left', value: r => (r.peakSeverity ? r.severityLabel : 'n/c') },
   { header: 'Faixa', width: 96, align: 'left', value: r => r.windowName },
-  { header: 'Duração', width: 58, align: 'right', value: r => duration(r.durationMinutes) },
-  { header: 'Pico kWh', width: 56, align: 'right', value: r => num(r.peakValueKwh) },
-  { header: 'Esperado', width: 56, align: 'right', value: r => num(r.baselineKwh) },
+  { header: 'Duração', width: 58, align: 'right', value: r => (r.origin === 'legacy_import' ? '—' : duration(r.durationMinutes)) },
+  { header: 'Pico kWh', width: 56, align: 'right', value: r => (r.peakValueKwh > 0 ? num(r.peakValueKwh) : '—') },
+  { header: 'Esperado', width: 56, align: 'right', value: r => (r.baselineKwh > 0 ? num(r.baselineKwh) : '—') },
   { header: 'Excedente kWh', width: 72, align: 'right', value: r => num(r.totalExcessKwh) },
   { header: 'Custo (R$)', width: 70, align: 'right', value: r => brl(r.totalCostBrl) },
   { header: 'Status', width: 56, align: 'left', value: r => (r.status === 'open' ? 'Em aberto' : 'Recuperado') },
@@ -365,6 +365,9 @@ export function renderPdf(model: ReportModel, options: PdfOptions = {}): Promise
         });
         doc.y = top + 15;
       });
+      if (s.rows.some(r => !r.peakSeverity)) {
+        doc.fillColor('#6B7280').font('Helvetica-Oblique').fontSize(7.5).text('n/c = não classificado: registros da versão anterior do sistema, que não guardava severidade, pico nem consumo esperado.', left, doc.y + 4, { width: pageW });
+      }
       if (s.rows.length > 0) {
         if (doc.y > bottomLimit()) { startPage(); }
         const top = doc.y + 2;

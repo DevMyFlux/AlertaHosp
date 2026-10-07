@@ -206,12 +206,3 @@ export async function loadLatestReadings(q: Queryable, unitId: number, since: Da
   );
   return res.rows.map(r => ({ sectorId: r.sector_id, ts: new Date(r.ts), intervalKwh: r.interval_kwh, status: r.status, flags: r.flags ?? [] }));
 }
-
-export async function countReadings(q: Queryable, unitId: number): Promise<{ total: number; first: Date | null; last: Date | null }> {
-  const res = await q.query<{ n: number; first: Date | null; last: Date | null }>(
-    'SELECT count(*)::int n, min(ts) first, max(ts) last FROM readings WHERE unit_id = $1',
-    [unitId]
-  );
-  const r = res.rows[0];
-  return { total: r.n, first: r.first ? new Date(r.first) : null, last: r.last ? new Date(r.last) : null };
-}

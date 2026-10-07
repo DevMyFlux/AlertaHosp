@@ -10,13 +10,6 @@ export { UNIT_CODES, isUnitCode, type UnitCode };
 
 export type SectorKind = 'critico' | 'infra' | 'imagem' | 'hvac';
 
-export const SECTOR_KIND_LABEL: Record<SectorKind, string> = {
-  critico: 'Crítico',
-  infra: 'Infraestrutura',
-  imagem: 'Imagem',
-  hvac: 'Climatização',
-};
-
 export interface SectorDef {
   /** Código canônico, único dentro da unidade (sem o "." inicial que alguns tags SQL trazem). */
   code: string;
@@ -142,12 +135,4 @@ export function resolveUnitCode(raw: unknown): UnitCode | null {
 
 export function getUnit(code: UnitCode): UnitDef {
   return UNITS[code];
-}
-
-export function monitoredSectors(unit: UnitDef): SectorDef[] {
-  return unit.sectors.filter(s => s.monitored);
-}
-
-export function findSector(unit: UnitDef, code: string): SectorDef | undefined {
-  return unit.sectors.find(s => s.code === code);
 }
