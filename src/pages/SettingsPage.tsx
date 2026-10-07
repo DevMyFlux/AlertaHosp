@@ -65,12 +65,12 @@ export function SettingsPage({ unit, theme, onTheme, auth }: { unit: UnitCode; t
           {!c ? <Skeleton className="h-40" /> : (
             <>
               <table className="data-table">
-                <thead><tr><th>Nível</th><th className="r">Desvios (σ)</th><th className="r">Excesso mínimo</th><th className="r">Confirmação</th></tr></thead>
+                <thead><tr><th>Nível</th><th className="r">Desvio estatístico</th><th className="r">Excesso mínimo</th><th className="r">Confirmação</th></tr></thead>
                 <tbody>
                   {(['atencao', 'alto', 'critico'] as const).map(s => (
                     <tr key={s}>
                       <td className="font-medium">{SEVERITY_LABEL[s]}</td>
-                      <td className="num r">&gt; {c.rules.levels[s].z.toString().replace('.', ',')}</td>
+                      <td className="num r">&gt; {c.rules.levels[s].z.toString().replace('.', ',')} σ</td>
                       <td className="num r">+{Math.round(c.rules.levels[s].pct * 100)}%</td>
                       <td className="num r">{c.rules.levels[s].persistence} leituras</td>
                     </tr>

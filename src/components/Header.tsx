@@ -79,12 +79,12 @@ export function Header({
           <span className="text-[15px] font-semibold tracking-tight">Monitor de Energia</span>
         </div>
         <UnitSwitcher route={route} />
-        <nav aria-label="Principal" className="flex items-center gap-1">
+        <nav aria-label="Principal" className="flex max-w-full items-center gap-1 overflow-x-auto">
           {NAV.map(n => {
             const active = n.page === route.page;
             return (
               <a key={n.page} href={href(route.unit, n.page)} aria-current={active ? 'page' : undefined}
-                className={cx('rounded-md px-3 py-1.5 text-sm font-medium no-underline transition-colors', active ? 'bg-unit-soft text-unit' : 'text-ink-2 hover:bg-surface-2 hover:text-ink')}>
+                className={cx("whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium no-underline transition-colors", active ? 'bg-unit-soft text-unit' : 'text-ink-2 hover:bg-surface-2 hover:text-ink')}>
                 {n.label}
               </a>
             );

@@ -24,7 +24,10 @@ async function start() {
     console.log(`[dev] PostgreSQL local (PGlite) em ${devDbDir()} — sem DATABASE_URL`);
   }
 
-  const deps = buildDeps(localDb ? { db: localDb, env } : { env });
+  // Demonstração local: congela o relógio logo depois da última leitura do snapshot de dados reais
+  const fakeNow = !isProd && process.env.DEV_FAKE_NOW ? new Date(process.env.DEV_FAKE_NOW) : null;
+  const deps = buildDeps({ env, ...(localDb ? { db: localDb } : {}), ...(fakeNow ? { now: () => fakeNow } : {}) });
+  if (fakeNow) console.log(`[dev] relógio fixado em ${fakeNow.toISOString()} (DEV_FAKE_NOW)`);
   const app = express();
   app.use(createApp(deps));
 

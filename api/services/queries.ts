@@ -168,7 +168,7 @@ export interface Overview {
   unit: { code: UnitCode; name: string; intervalMin: number; timezone: string };
   period: { from: Date; to: Date; days: number };
   freshness: { lastReadingTs: Date | null; ageMinutes: number | null; sourceStatus: string; lastCycleAt: Date | null; lastCycleStatus: string | null };
-  totals: { alerts: number; byPeak: Record<Severity, number>; excessKwh: number; costBrl: number; notificationsSent: number; openNow: number };
+  totals: { alerts: number; byPeak: Record<Severity, number>; unclassified: number; excessKwh: number; costBrl: number; notificationsSent: number; openNow: number };
   openAlerts: AlertItem[];
   bySector: { sectorCode: string; sectorName: string; alerts: number; excessKwh: number; costBrl: number }[];
   byHour: { hour: number; alerts: number }[];
@@ -185,6 +185,7 @@ export async function getOverview(q: Queryable, cfg: UnitConfig, days: number, n
             count(*) FILTER (WHERE peak_severity = 'atencao')::int atencao,
             count(*) FILTER (WHERE peak_severity = 'alto')::int alto,
             count(*) FILTER (WHERE peak_severity = 'critico')::int critico,
+            count(*) FILTER (WHERE peak_severity IS NULL)::int unclassified,
             COALESCE(sum(total_excess_kwh), 0) excess, COALESCE(sum(total_cost_brl), 0) cost
        FROM alerts WHERE unit_id = $1 AND opened_at >= $2 AND NOT suspect`,
     [cfg.id, from]
@@ -226,20 +227,25 @@ export async function getOverview(q: Queryable, cfg: UnitConfig, days: number, n
   );
 
   const lastReadingTs = state.lastReadingTs;
+  const ageMinutes = lastReadingTs ? Math.round((now.getTime() - lastReadingTs.getTime()) / 60000) : null;
+  // se o gatilho do ciclo parar, o status gravado ficaria "online" para sempre — a idade da última leitura manda
+  const staleAfter = Math.max(30, cfg.expectedIntervalMin * 3);
+  const sourceStatus = ageMinutes !== null && ageMinutes > staleAfter ? 'stale' : state.sourceStatus;
   const t = totals.rows[0];
   return {
     unit: { code: cfg.code, name: cfg.name, intervalMin: cfg.expectedIntervalMin, timezone: cfg.timezone },
     period: { from, to: now, days },
     freshness: {
       lastReadingTs,
-      ageMinutes: lastReadingTs ? Math.round((now.getTime() - lastReadingTs.getTime()) / 60000) : null,
-      sourceStatus: state.sourceStatus,
+      ageMinutes,
+      sourceStatus,
       lastCycleAt: state.lastCycleAt,
       lastCycleStatus: state.lastCycleStatus,
     },
     totals: {
       alerts: n(t.alerts),
       byPeak: { atencao: n(t.atencao), alto: n(t.alto), critico: n(t.critico) },
+      unclassified: n(t.unclassified),
       excessKwh: n(t.excess),
       costBrl: n(t.cost),
       notificationsSent: sent.rows[0].n,
@@ -274,6 +280,8 @@ export interface SectorSnapshot {
   openSeverity: Severity | null;
   openedAt: Date | null;
   flags: string[];
+  /** a última leitura é velha demais para refletir o momento atual (fonte parada) */
+  stale: boolean;
 }
 
 export async function getSectorSnapshots(q: Queryable, cfg: UnitConfig, now: Date): Promise<SectorSnapshot[]> {
@@ -292,12 +300,13 @@ export async function getSectorSnapshots(q: Queryable, cfg: UnitConfig, now: Dat
       code: s.code, name: s.name, kind: s.kind, monitored: s.monitored, state: 'no_data',
       ts: lr?.ts ?? null, valueKwh: lr?.intervalKwh ?? null, expectedKwh: null, pctOver: null, limits: null, window: null, baselineSamples: null,
       openAlertId: oa ? n(oa.id) : null, openSeverity: oa?.severity ?? null, openedAt: oa ? new Date(oa.opened_at) : null, flags: lr?.flags ?? [],
+      stale: !!lr && now.getTime() - lr.ts.getTime() > staleMs,
     };
     if (!s.monitored) {
       out.push(snap);
       continue;
     }
-    if (!lr || now.getTime() - lr.ts.getTime() > staleMs) {
+    if (!lr) {
       out.push(snap);
       continue;
     }

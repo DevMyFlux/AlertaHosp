@@ -46,7 +46,7 @@ export function OverviewPage({ unit }: { unit: UnitCode }) {
         {d ? (
           <>
             <Stat label={`Alertas ${periodLabel}`} value={int(d.totals.alerts)}
-              sub={`${d.totals.byPeak.critico} crítico · ${d.totals.byPeak.alto} alto · ${d.totals.byPeak.atencao} atenção`} />
+              sub={`${d.totals.byPeak.critico} crítico · ${d.totals.byPeak.alto} alto · ${d.totals.byPeak.atencao} atenção${d.totals.unclassified ? ` · ${d.totals.unclassified} da versão anterior` : ''}`} />
             <Stat label="Em aberto agora" value={int(d.totals.openNow)} tone={d.totals.openNow > 0 ? 'alto' : undefined}
               sub={d.totals.openNow ? 'ver lista ao lado' : 'nenhum desvio ativo'} />
             <Stat label="Excedente estimado" value={<>{kwh(d.totals.excessKwh)} <span className="text-sm font-normal text-ink-3">kWh</span></>}

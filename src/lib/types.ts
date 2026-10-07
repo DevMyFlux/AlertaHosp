@@ -43,7 +43,7 @@ export interface Overview {
   unit: { code: UnitCode; name: string; intervalMin: number; timezone: string };
   period: { from: string; to: string; days: number };
   freshness: { lastReadingTs: string | null; ageMinutes: number | null; sourceStatus: 'unknown' | 'online' | 'stale'; lastCycleAt: string | null; lastCycleStatus: string | null };
-  totals: { alerts: number; byPeak: Record<Severity, number>; excessKwh: number; costBrl: number; notificationsSent: number; openNow: number };
+  totals: { alerts: number; byPeak: Record<Severity, number>; unclassified: number; excessKwh: number; costBrl: number; notificationsSent: number; openNow: number };
   openAlerts: AlertItem[];
   bySector: { sectorCode: string; sectorName: string; alerts: number; excessKwh: number; costBrl: number }[];
   byHour: { hour: number; alerts: number }[];
@@ -68,6 +68,7 @@ export interface SectorSnapshot {
   openSeverity: Severity | null;
   openedAt: string | null;
   flags: string[];
+  stale: boolean;
 }
 
 export interface SeriesPoint {

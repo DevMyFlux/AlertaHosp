@@ -11,13 +11,13 @@ SQL Server hmb2 ──(alerta_hmb.py)──► API local :5000/energia
                                           ▼
                      Planilha Google de TELEMETRIA do HMB
                                           │
-                         (Apps Script Code_HMB.gs, gatilho 15 min)
+                         (Apps Script Trigger.gs, gatilho 15 min)
                                           ▼
-                 backend  /api/cron-check?hospital=hmb  ──► Vonage + planilha de alertas
+              backend  /api/cron-check?hospital=HMB  ──► PostgreSQL (alertas) + WhatsApp
 ```
 
 Este pipeline **só alimenta a planilha de telemetria**. Detecção de anomalia
-e disparo de alerta são do backend + Apps Script (`apps-script/Code_HMB.gs`).
+e disparo de alerta são do backend (motor V2, PostgreSQL); o Apps Script (`apps-script/Trigger.gs`) só agenda o ciclo a cada 15 min.
 
 ---
 
@@ -32,8 +32,9 @@ e disparo de alerta são do backend + Apps Script (`apps-script/Code_HMB.gs`).
 | `AlertaHosp-HMB-Sync.xml` | Tarefa do Agendador do Windows (15 min + no boot + restart on failure). |
 
 **Planilha do HMB** (uma só, `1_pkDSva4K9pgqXgTM3jCMdU5cbNDKEVMyzRWIC0Hihc`):
-aba `EstadoAlertas` (histórico de alertas, escrita pelo Apps Script) + aba
-`Telemetria` (leituras de consumo, escrita por este pipeline).
+aba `Telemetria` (leituras de consumo, escrita por este pipeline). A aba
+`EstadoAlertas` é do motor antigo (V1): ficou como arquivo histórico — os
+alertas passaram a viver no PostgreSQL (ver `docs/04-migracao-postgres.md`).
 
 ---
 

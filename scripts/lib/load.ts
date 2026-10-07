@@ -1,6 +1,7 @@
 // Carrega telemetria exportada (CSV da planilha) e aplica a mesma normalização
 // do servidor. Usado pelas ferramentas de análise/replay — nunca em produção.
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import Papa from 'papaparse';
 import { parseSheetRows } from '../../core/telemetry/parse.js';
 import { normalizeSamples, type NormalizedReading, type SourceEvent } from '../../core/telemetry/normalize.js';
@@ -17,7 +18,8 @@ export interface LoadedUnit {
 
 export function loadUnitFromCsv(code: UnitCode, csvPath: string): LoadedUnit {
   const unit = getUnit(code);
-  const text = fs.readFileSync(csvPath, 'utf8');
+  const buf = fs.readFileSync(csvPath);
+  const text = (csvPath.endsWith('.gz') ? zlib.gunzipSync(buf) : buf).toString('utf8');
   const rows = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: true }).data;
   const { samples } = parseSheetRows(rows, unit);
   const { readings, events } = normalizeSamples(

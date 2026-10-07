@@ -15,7 +15,8 @@
     "history:load": "tsx scripts/load-history.ts",
     "replay": "tsx scripts/replay.ts",
     "recall": "tsx scripts/recall.ts",
-    "sensitivity": "tsx scripts/sensitivity.ts"
+    "sensitivity": "tsx scripts/sensitivity.ts",
+    "dev:demo": "tsx scripts/dev-demo.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

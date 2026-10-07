@@ -74,7 +74,6 @@ function AlertDetailDrawer({ unit, id, intervalMin, onClose }: { unit: UnitCode;
   }, [a]);
   const series = useRemote(signal => (a && a.origin === 'engine' && window ? api.series(unit, a.sectorCode, { from: window.from, to: window.to }, signal) : Promise.resolve(null)), [unit, a?.id]);
   const shownEvents = (detail.data?.events ?? []).filter(e => e.type !== 'breach');
-  const breaches = (detail.data?.events ?? []).filter(e => e.type === 'breach');
 
   return (
     <Drawer open onClose={onClose}
@@ -124,6 +123,9 @@ function AlertDetailDrawer({ unit, id, intervalMin, onClose }: { unit: UnitCode;
                         <span className="num text-xs text-ink-3">{dateTimeFull(e.ts)}</span>
                       </div>
                       {e.explain.reason && <p className="mt-1 text-[13px] text-ink-2">{e.explain.reason}</p>}
+                      {e.type === 'opened' && a.openedAt !== e.ts && (
+                        <p className="mt-1 text-xs text-ink-3">Confirmado depois de {e.explain.persistence?.required ?? 2} leituras seguidas acima do limite — a primeira foi às {dateTimeFull(a.openedAt)}. Um pico isolado não abre alerta.</p>
+                      )}
                       <div className="num mt-1 flex flex-wrap gap-x-4 text-xs text-ink-3">
                         <span>consumo {kwhUnit(e.valueKwh)}</span><span>esperado {kwhUnit(e.expectedKwh)}</span><span>limite {kwhUnit(e.limitKwh)}</span>
                         {e.z !== null && <span>{kwh(e.z)}σ</span>}
@@ -132,7 +134,7 @@ function AlertDetailDrawer({ unit, id, intervalMin, onClose }: { unit: UnitCode;
                     </li>
                   ))}
                 </ol>
-                <p className="mt-3 text-xs text-ink-3">{breaches.length} leitura(s) acima do limite registradas durante o alerta. Regra: {shownEvents[0]?.explain.rule ?? dash}.</p>
+                <p className="mt-3 text-xs text-ink-3">{a.breachCount} leitura(s) acima do limite durante o alerta. Regra: {shownEvents[0]?.explain.rule ?? dash}.</p>
               </div>
               {detail.data!.notifications.length > 0 && (
                 <div>

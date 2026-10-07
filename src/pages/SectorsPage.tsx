@@ -104,6 +104,11 @@ export function SectorsPage({ unit, selected, intervalMin }: { unit: UnitCode; s
         subtitle={res.data ? `${counts.total} setores monitorados · ${counts.attention ? `${counts.attention} fora do padrão agora` : 'todos dentro do padrão'}` : 'Carregando…'}
         actions={<Segmented label="Filtro" value={filter} onChange={setFilter} options={FILTERS} />} />
       {res.error && !res.data && <ErrorBox error={res.error} onRetry={res.reload} />}
+      {res.data?.sectors.some(s => s.monitored && s.stale) && (
+        <div role="status" className="mb-3 rounded-lg border px-4 py-3 text-[13px]" style={{ borderColor: 'var(--warn)', background: 'var(--warn-soft)', color: 'var(--warn)' }}>
+          <strong>Leituras desatualizadas</strong> — a fonte de dados de {unit} não está enviando. Os estados abaixo são os da última leitura recebida, não do momento atual.
+        </div>
+      )}
       <Panel flush>
         {!res.data ? <div className="p-4"><Skeleton className="h-64" /></div> : sectors.length === 0 ? (
           <Empty title="Nenhum setor neste filtro" />
@@ -125,7 +130,7 @@ export function SectorsPage({ unit, selected, intervalMin }: { unit: UnitCode; s
                     <td className="num r text-ink-2">{kwh(s.expectedKwh)}</td>
                     <td className={cx('num r', isAttention(s.state) && 'font-medium')}>{pctOver(s.pctOver)}</td>
                     <td><LevelBar s={s} /></td>
-                    <td><StatePill state={s.state} /></td>
+                    <td><span className={s.stale ? 'opacity-50' : undefined} title={s.stale ? 'Leitura desatualizada — a fonte não está enviando dados' : undefined}><StatePill state={s.state} /></span></td>
                     <td className="num text-xs text-ink-3">{dateTime(s.ts)}</td>
                   </tr>
                 ))}

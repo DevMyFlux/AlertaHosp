@@ -6,7 +6,7 @@ import { createLogger } from './infra/logger.js';
 import { SheetTelemetrySource } from './infra/sheetSource.js';
 import { VonageNotifier } from './infra/vonage.js';
 
-export function buildDeps(overrides: { db?: Db | null; env?: AppEnv } = {}): AppDeps {
+export function buildDeps(overrides: { db?: Db | null; env?: AppEnv; now?: () => Date } = {}): AppDeps {
   const env = overrides.env ?? loadAppEnv();
   const log = createLogger();
   let db: Db | null = overrides.db !== undefined ? overrides.db : null;
@@ -22,7 +22,7 @@ export function buildDeps(overrides: { db?: Db | null; env?: AppEnv } = {}): App
     source: new SheetTelemetrySource(),
     notifier: new VonageNotifier(env, log),
     log,
-    now: () => new Date(),
+    now: overrides.now ?? (() => new Date()),
     version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? process.env.npm_package_version ?? 'dev',
   };
 }
