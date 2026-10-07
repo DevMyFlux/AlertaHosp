@@ -144,7 +144,7 @@ setor por ciclo (sem agrupamento).
 
 ## 7. Riscos
 
-1. Ligar o V2 sem `DATABASE_URL` derrubaria os alertas → V2 só entra em produção após banco provisionado, backfill e período em *shadow mode* (ver `docs/04-migracao-postgres.md`).
+1. Ligar o V2 sem `DATABASE_URL` derrubaria os alertas → V2 só entra em produção após banco provisionado, backfill e período em *shadow mode* (ver `docs/03-migracao-postgres.md`).
 2. Mudança de regra de alerta afeta operação clínica → motor novo precisa de backtest com dados reais (ferramenta `scripts/replay.ts`) e rollout por unidade.
 3. Templates WhatsApp aprovados são fixos (9 variáveis): agrupamento e mensagens de sistema precisam caber neles.
 4. Dados de produção continuam chegando pela planilha até o script Python ser trocado; o V2 precisa ler a planilha *e* o banco durante a transição.
@@ -171,7 +171,7 @@ tests/                node:test + tsx; PGlite para testar SQL de verdade
 docs/
 ```
 
-Motor de alertas V2 (detalhe em `docs/03-motor-de-alertas-v2.md`): normalização com *quality gate* → baseline robusto (mediana/MAD, por faixa operacional configurável × tipo de dia) → nível por z-score robusto + piso percentual/absoluto + envelope de percentil → persistência → ciclo de vida (abre, escala, recupera) → política (severidade × cooldown × lembrete × agrupamento) → explicação gravada por evento.
+Motor de alertas V2 (detalhe em `docs/02-motor-de-alertas-v2.md`): normalização com *quality gate* → baseline robusto (mediana/MAD, por faixa operacional configurável × tipo de dia) → nível por z-score robusto + piso percentual/absoluto + envelope de percentil → persistência → ciclo de vida (abre, escala, recupera) → política (severidade × cooldown × lembrete × agrupamento) → explicação gravada por evento.
 
 ## 10. Ordem recomendada de implementação
 1. Backup/branch ✔ → 2. núcleo de domínio + testes (normalização, estatística, motor) → 3. replay com dados reais para calibrar → 4. migrations + repositórios (PGlite) → 5. orquestrador do ciclo + rotas + segurança → 6. migração do legado → 7. relatórios PDF/XLSX → 8. frontend → 9. QA/regressão/performance → 10. limpeza e documentação.

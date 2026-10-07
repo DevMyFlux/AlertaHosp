@@ -19,7 +19,9 @@ async function start() {
 
   let localDb: Db | undefined;
   if (!env.databaseUrl && !isProd) {
-    const { createTestDb, devDbDir } = await import('./scripts/lib/pgliteDb.js');
+    // caminho em variável de propósito: o esbuild não empacota (nem avisa sobre) o banco local de desenvolvimento
+    const devDbModule = './scripts/lib/pgliteDb.js';
+    const { createTestDb, devDbDir } = (await import(devDbModule)) as typeof import('./scripts/lib/pgliteDb.js');
     localDb = await createTestDb({ dataDir: devDbDir() });
     console.log(`[dev] PostgreSQL local (PGlite) em ${devDbDir()} — sem DATABASE_URL`);
   }

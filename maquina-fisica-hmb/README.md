@@ -34,7 +34,7 @@ e disparo de alerta são do backend (motor V2, PostgreSQL); o Apps Script (`apps
 **Planilha do HMB** (uma só, `1_pkDSva4K9pgqXgTM3jCMdU5cbNDKEVMyzRWIC0Hihc`):
 aba `Telemetria` (leituras de consumo, escrita por este pipeline). A aba
 `EstadoAlertas` é do motor antigo (V1): ficou como arquivo histórico — os
-alertas passaram a viver no PostgreSQL (ver `docs/04-migracao-postgres.md`).
+alertas passaram a viver no PostgreSQL (ver `docs/03-migracao-postgres.md`).
 
 ---
 

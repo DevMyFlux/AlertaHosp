@@ -7,7 +7,7 @@
 //
 // As faixas vivem no banco (`operational_windows`, editáveis por unidade).
 // `DEFAULT_WINDOWS` é só o seed inicial e o padrão de testes/replay —
-// calibrado com a curva de carga real do HCN e do HMB (ver docs/03).
+// calibrado com a curva de carga real do HCN e do HMB (ver docs/02).
 
 import { dayTypeOf, localParts, type DayType } from '../time.js';
 import type { WindowDayType } from './types.js';

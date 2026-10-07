@@ -231,3 +231,45 @@ describe('ingestão direta pela máquina do hospital', () => {
     assert.equal((await get('/api/ingest/HCN', { method: 'POST', body: '{}', ...bearer('qualquer'), headers: { 'content-type': 'application/json', Authorization: 'Bearer qualquer' } })).status, 401);
   });
 });
+
+describe('webhook de status da Vonage (rejeição assíncrona da Meta)', () => {
+  test('mensagem rejeitada vira "falhou" e o aviso do alerta volta a ser elegível', async () => {
+    const alert = (await db.query<{ id: number }>('SELECT id FROM alerts WHERE origin = $1 ORDER BY id DESC LIMIT 1', ['engine'])).rows[0];
+    assert.ok(alert, 'há um alerta do motor criado pelos testes anteriores');
+    const unit = (await db.query<{ unit_id: number }>('SELECT unit_id FROM alerts WHERE id = $1', [alert.id])).rows[0];
+    await db.query("UPDATE alerts SET last_notified_at = now(), last_notified_severity = 'alto' WHERE id = $1", [alert.id]);
+    const n = await db.query<{ id: number }>(
+      `INSERT INTO notifications (unit_id, channel, kind, status, payload) VALUES ($1, 'whatsapp', 'alert_digest', 'sent', $2::jsonb) RETURNING id`,
+      [unit.unit_id, JSON.stringify({ result: { recipients: [{ messageUuid: 'uuid-rejeitada-1', status: 'success' }] } })]
+    );
+    await db.query('INSERT INTO notification_alerts (notification_id, alert_id, reason, prev_notified_at, prev_notified_severity) VALUES ($1, $2, $3, NULL, NULL)', [n.rows[0].id, alert.id, 'opened']);
+
+    const res = await fetch(`${base}/api/webhooks/vonage-status`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message_uuid: 'uuid-rejeitada-1', status: 'rejected', error: { title: 'Invalid Parameters' } }),
+    });
+    assert.equal(res.status, 200);
+    const after = (await db.query<{ status: string; error: string | null }>('SELECT status, error FROM notifications WHERE id = $1', [n.rows[0].id])).rows[0];
+    assert.equal(after.status, 'failed');
+    assert.match(after.error ?? '', /rejected.*Invalid Parameters/);
+    const a = (await db.query<{ last_notified_at: Date | null }>('SELECT last_notified_at FROM alerts WHERE id = $1', [alert.id])).rows[0];
+    assert.equal(a.last_notified_at, null, 'o motor volta a propor o aviso');
+  });
+
+  test('status de mensagem desconhecida ou entregue é aceito sem efeito', async () => {
+    for (const body of [{ message_uuid: 'nao-existe', status: 'rejected' }, { message_uuid: 'x', status: 'delivered' }, {}]) {
+      const res = await fetch(`${base}/api/webhooks/vonage-status`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      assert.equal(res.status, 200);
+    }
+  });
+
+  test('com VONAGE_SIGNATURE_SECRET definido, chamada sem assinatura válida é recusada', async () => {
+    process.env.VONAGE_SIGNATURE_SECRET = 'assinatura-teste';
+    try {
+      const res = await fetch(`${base}/api/webhooks/vonage-status`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer a.b.c' }, body: '{}' });
+      assert.equal(res.status, 401);
+    } finally {
+      delete process.env.VONAGE_SIGNATURE_SECRET;
+    }
+  });
+});
