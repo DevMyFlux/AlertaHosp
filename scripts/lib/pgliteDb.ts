@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Db, Queryable, QueryResult } from '../../api/infra/db.js';
+import type { Db, Queryable, QueryResult } from '../../backend/infra/db.js';
 import { migrate } from '../../db/migrate.js';
 import { seedReferenceData } from '../../db/seed.js';
 
@@ -45,7 +45,7 @@ export const MIGRATIONS_DIR = path.resolve(path.dirname(fileURLToPath(import.met
 export async function createTestDb(options: { dataDir?: string; seed?: boolean; migrate?: boolean } = {}): Promise<Db> {
   if (options.dataDir) fs.mkdirSync(options.dataDir, { recursive: true });
   const pglite = new PGlite(options.dataDir, {
-    // numeric (tarifa, custo) como number, igual ao driver `pg` configurado em api/infra/db.ts
+    // numeric (tarifa, custo) como number, igual ao driver `pg` configurado em backend/infra/db.ts
     parsers: { 1700: (v: string) => Number(v) },
   });
   await pglite.waitReady;

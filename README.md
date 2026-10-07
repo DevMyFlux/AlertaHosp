@@ -14,7 +14,7 @@ máquina do hospital ─► planilha Google ─► /api/cron-check (a cada 15 mi
 | Pasta | O quê |
 |---|---|
 | `core/` | domínio **puro e testado**: normalização de contadores, baseline, detector, ciclo de vida, política, mensagens, modelo de relatório |
-| `api/` | Express: rotas finas (`routes/`), regras de negócio (`services/`), integrações (`infra/`: PostgreSQL, planilha, Vonage, logs) |
+| `backend/` | Express: rotas finas (`routes/`), regras de negócio (`services/`), integrações (`infra/`: PostgreSQL, planilha, Vonage, logs) |
 | `db/` | migrations SQL versionadas, executor e seed |
 | `src/` | painel (React + Tailwind + Recharts): Visão geral · Setores · Alertas · Configurações; unidade sempre na URL |
 | `scripts/` | carga de histórico, migração, backtest (`replay`), recall, sensibilidade |

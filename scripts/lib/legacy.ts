@@ -4,7 +4,7 @@
 // contador) entram MARCADAS como suspeitas — preservadas para auditoria, mas
 // fora dos totais.
 
-import type { Queryable } from '../../api/infra/db.js';
+import type { Queryable } from '../../backend/infra/db.js';
 import { UNITS, type UnitCode, type UnitDef } from '../../core/units.js';
 import type { SourceEvent } from '../../core/telemetry/normalize.js';
 

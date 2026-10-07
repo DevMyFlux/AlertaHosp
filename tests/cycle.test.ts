@@ -4,9 +4,9 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestDb, resetOperationalData } from '../scripts/lib/pgliteDb.js';
-import { runCycle, type CycleDeps } from '../api/services/cycle.js';
-import { silentLogger } from '../api/infra/logger.js';
-import type { Db } from '../api/infra/db.js';
+import { runCycle, type CycleDeps } from '../backend/services/cycle.js';
+import { silentLogger } from '../backend/infra/logger.js';
+import type { Db } from '../backend/infra/db.js';
 import { FakeNotifier, SimSource, UNITS } from './sim.js';
 
 const START = new Date(Date.UTC(2026, 8, 1, 3, 0, 0)); // 2026-09-01 00:00 BRT

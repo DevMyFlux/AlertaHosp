@@ -7,10 +7,10 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
-import { createApp } from './api/app.js';
-import { buildDeps } from './api/bootstrap.js';
-import { loadAppEnv } from './api/infra/env.js';
-import type { Db } from './api/infra/db.js';
+import { createApp } from './backend/app.js';
+import { buildDeps } from './backend/bootstrap.js';
+import { loadAppEnv } from './backend/infra/env.js';
+import type { Db } from './backend/infra/db.js';
 
 async function start() {
   const env = loadAppEnv();

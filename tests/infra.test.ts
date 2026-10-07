@@ -1,10 +1,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLogger, redact } from '../api/infra/logger.js';
-import { loadAppEnv, maskPhone } from '../api/infra/env.js';
-import { gvizUrl, SheetTelemetrySource, type FetchLike } from '../api/infra/sheetSource.js';
-import { createSessionToken, safeEqual, verifySessionToken } from '../api/http/security.js';
-import { redactConnectionString } from '../api/infra/db.js';
+import { createLogger, redact } from '../backend/infra/logger.js';
+import { loadAppEnv, maskPhone } from '../backend/infra/env.js';
+import { gvizUrl, SheetTelemetrySource, type FetchLike } from '../backend/infra/sheetSource.js';
+import { createSessionToken, safeEqual, verifySessionToken } from '../backend/http/security.js';
+import { redactConnectionString } from '../backend/infra/db.js';
 import { buildSmsText, buildWhatsAppParams, monthlyProjectionBrl, type DigestItem } from '../core/alerts/messages.js';
 import { describeEvaluation } from '../core/alerts/explain.js';
 import { resolveUnitCode, UNITS } from '../core/units.js';

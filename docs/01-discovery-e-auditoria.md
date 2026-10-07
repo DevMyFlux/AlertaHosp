@@ -19,7 +19,7 @@ snapshot em `backups/2026-10-07-antes-da-atualizacao/` (gitignored).
 |---|---|---|
 | Ingestão | fora deste repo (HCN) / `maquina-fisica-hmb/` (HMB) | Python lê SQL Server e insere em planilha Google |
 | "Banco" | Google Sheets (2 abas por hospital) + `localStorage` do navegador | sem schema, sem transação, sem constraint |
-| Backend | `api/app.ts` (Express) rodando como função única na Vercel | `/api/notify`, `/api/cron-check`, `/api/alert-history`, `/api/chat`, webhooks Vonage |
+| Backend | `backend/app.ts` (Express) rodando como função única na Vercel | `/api/notify`, `/api/cron-check`, `/api/alert-history`, `/api/chat`, webhooks Vonage |
 | Frontend | `src/` (React 19, Vite 6, Tailwind 4, Recharts) | recalcula anomalias por conta própria a partir do CSV |
 | Cron | Apps Script (`pingCronCheck`) → `GET /api/cron-check` | a cada 15 min, um gatilho por hospital |
 

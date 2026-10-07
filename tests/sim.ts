@@ -2,7 +2,7 @@
 // mais recente no topo) e permite injetar os problemas reais do campo —
 // reinício da fonte, lacunas, atraso, anomalias de consumo — de forma
 // determinística (PRNG com semente).
-import type { TelemetrySource, DigestMessage, Notifier, NotifierDescription, SendOutcome } from '../api/infra/ports.js';
+import type { TelemetrySource, DigestMessage, Notifier, NotifierDescription, SendOutcome } from '../backend/infra/ports.js';
 import type { UnitCode, UnitDef } from '../core/units.js';
 import { UNITS } from '../core/units.js';
 

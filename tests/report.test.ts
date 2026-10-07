@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { buildReportModel, reportFileName, ReportIntegrityError, type ReportAlert } from '../core/report/model.js';
-import { renderPdf, renderXlsx } from '../api/services/reportRender.js';
+import { renderPdf, renderXlsx } from '../backend/services/reportRender.js';
 import { UNITS, type UnitCode } from '../core/units.js';
 import { pdfText } from './helpers.js';
 

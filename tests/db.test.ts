@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { createTestDb, MIGRATIONS_DIR } from '../scripts/lib/pgliteDb.js';
 import { migrate, readMigrations } from '../db/migrate.js';
 import { seedReferenceData } from '../db/seed.js';
-import { loadUnitConfig } from '../api/infra/repos/config.js';
-import type { Db } from '../api/infra/db.js';
+import { loadUnitConfig } from '../backend/infra/repos/config.js';
+import type { Db } from '../backend/infra/db.js';
 import { UNITS } from '../core/units.js';
 
 let db: Db;

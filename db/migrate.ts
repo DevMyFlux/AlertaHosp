@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Db, Queryable } from '../api/infra/db.js';
+import type { Db, Queryable } from '../backend/infra/db.js';
 
 const LOCK_KEY = 727274;
 const FILE_RE = /^(\d{4})_[a-z0-9_]+\.sql$/;

@@ -6,8 +6,8 @@
 import 'dotenv/config';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createPgDb, redactConnectionString } from '../api/infra/db.js';
-import { loadAppEnv } from '../api/infra/env.js';
+import { createPgDb, redactConnectionString } from '../backend/infra/db.js';
+import { loadAppEnv } from '../backend/infra/env.js';
 import { migrate } from '../db/migrate.js';
 import { seedReferenceData } from '../db/seed.js';
 

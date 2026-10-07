@@ -25,6 +25,7 @@
   },
   "include": [
     "api",
+    "backend",
     "core",
     "db",
     "scripts",

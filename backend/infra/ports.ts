@@ -1,6 +1,6 @@
 // Fronteiras do sistema com o mundo externo, como interfaces — o serviço de
 // ciclo depende delas, não de Vonage/Google. Nos testes entram implementações
-// em memória; em produção, as reais (api/infra/vonage.ts, sheetSource.ts).
+// em memória; em produção, as reais (backend/infra/vonage.ts, sheetSource.ts).
 
 import type { UnitCode, UnitDef } from '../../core/units.js';
 

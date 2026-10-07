@@ -2,7 +2,7 @@
 
 Objetivo: **menos mensagens, nenhum problema real escondido, e cada alerta explicável.**
 Todo o motor é código puro e testado em `core/` (sem rede, sem banco, sem relógio global);
-`api/services/cycle.ts` só liga o motor ao banco e ao WhatsApp.
+`backend/services/cycle.ts` só liga o motor ao banco e ao WhatsApp.
 
 ## Pipeline
 

@@ -5,11 +5,11 @@ import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import ExcelJS from 'exceljs';
 import { createTestDb } from '../scripts/lib/pgliteDb.js';
-import { createApp } from '../api/app.js';
-import type { AppDeps } from '../api/context.js';
-import { loadAppEnv } from '../api/infra/env.js';
-import { silentLogger } from '../api/infra/logger.js';
-import type { Db } from '../api/infra/db.js';
+import { createApp } from '../backend/app.js';
+import type { AppDeps } from '../backend/context.js';
+import { loadAppEnv } from '../backend/infra/env.js';
+import { silentLogger } from '../backend/infra/logger.js';
+import type { Db } from '../backend/infra/db.js';
 import { FakeNotifier, SimSource, UNITS } from './sim.js';
 
 const START = new Date(Date.UTC(2026, 8, 1, 3, 0, 0));

@@ -4,7 +4,7 @@
 //
 // A Vonage aceita o envio de forma síncrona e só informa a rejeição real da
 // Meta depois, por webhook — `parseStatusWebhook` traduz esse retorno para o
-// sistema registrar a falha (ver api/routes/webhooks.ts).
+// sistema registrar a falha (ver backend/routes/webhooks.ts).
 
 import { Vonage } from '@vonage/server-sdk';
 import { Auth } from '@vonage/auth';

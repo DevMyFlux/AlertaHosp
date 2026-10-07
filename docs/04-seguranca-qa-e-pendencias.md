@@ -9,7 +9,7 @@
 | S3 | `GET /api/alert-history` público | Leitura do painel protegida por sessão quando `APP_ACCESS_PASSWORD` está definida (hoje opcional para não travar quem usa sem login — **defina-a em produção**) |
 | S4 | Segredo do HCN commitado em `apps-script/Code.gs` | Arquivo removido; `Trigger.gs` lê o segredo das Propriedades do script. **O segredo antigo continua no histórico do Git → rotacione** (nova `CRON_SECRET` na Vercel + Propriedade do script) |
 | S5 | Segredo em `?secret=` e comparação simples | Só `Authorization: Bearer`; comparação em tempo constante; `?secret=` retorna 401 (teste) |
-| S6 | Telefone, remetente e namespace embutidos no código | Telefone: **nenhum padrão**, só `ALERT_PHONE_NUMBERS[_HMB]`. Remetente/namespace do HCN (identificadores públicos da WABA) ficam num bloco único e documentado em `api/infra/env.ts` |
+| S6 | Telefone, remetente e namespace embutidos no código | Telefone: **nenhum padrão**, só `ALERT_PHONE_NUMBERS[_HMB]`. Remetente/namespace do HCN (identificadores públicos da WABA) ficam num bloco único e documentado em `backend/infra/env.ts` |
 | S7 | Chave privada da Vonage no `localStorage`/corpo da requisição | **Removido**: credenciais só no servidor |
 | S8 | `xlsx` com 2 CVEs altas | Substituído por `exceljs` (relatórios agora no servidor) |
 | S9 | Segredo do HMB em `.claude/settings.local.json` (não ignorado) | `.claude/` no `.gitignore`; **rotacione `CRON_SECRET_HMB`** (também apareceu em conversas) |

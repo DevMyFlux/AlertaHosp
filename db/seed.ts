@@ -4,7 +4,7 @@
 // core/units.ts, mas NUNCA sobrescreve configuração operacional que alguém
 // possa ter ajustado no banco (tarifa, faixas, regras).
 
-import type { Queryable } from '../api/infra/db.js';
+import type { Queryable } from '../backend/infra/db.js';
 import { UNIT_CODES, UNITS } from '../core/units.js';
 import { DEFAULT_WINDOWS } from '../core/alerts/windows.js';
 import { DEFAULT_NOTIFY_POLICY, DEFAULT_RULES } from '../core/alerts/rules.js';
