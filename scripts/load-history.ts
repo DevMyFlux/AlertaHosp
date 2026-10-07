@@ -11,7 +11,7 @@
 //      dos últimos N dias (alertas e linha do tempo; NENHUMA mensagem é enviada);
 //   3. alertas da V1 → tabela alerts (origin = legacy_import), artefatos marcados como suspeitos;
 //   4. relatório de reconciliação (contagens e totais origem × destino).
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 import Papa from 'papaparse';
@@ -25,6 +25,8 @@ import { seedReferenceData } from '../db/seed.js';
 import { UNITS, isUnitCode, type UnitCode } from '../core/units.js';
 import { loadUnitFromCsv } from './lib/load.js';
 import { importLegacy, type LegacyRow } from './lib/legacy.js';
+
+dotenv.config({ path: ['.env.local', '.env'] });
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);

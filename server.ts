@@ -4,13 +4,15 @@
 //                     (PGlite, fora da pasta do projeto) — rode `npm run dev:seed` para carregá-lo com
 //                     os dados reais exportados.
 //   npm start       → API + frontend já compilado (dist/).
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import path from 'node:path';
 import { createApp } from './backend/app.js';
 import { buildDeps } from './backend/bootstrap.js';
 import { loadAppEnv } from './backend/infra/env.js';
 import type { Db } from './backend/infra/db.js';
+
+dotenv.config({ path: ['.env.local', '.env'] });
 
 async function start() {
   const env = loadAppEnv();

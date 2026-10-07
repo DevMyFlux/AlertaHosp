@@ -3,13 +3,15 @@
 //   npm run db:migrate
 //
 // Idempotente: pode rodar a cada deploy. Nunca imprime a senha da conexão.
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPgDb, redactConnectionString } from '../backend/infra/db.js';
 import { loadAppEnv } from '../backend/infra/env.js';
 import { migrate } from '../db/migrate.js';
 import { seedReferenceData } from '../db/seed.js';
+
+dotenv.config({ path: ['.env.local', '.env'] });
 
 const env = loadAppEnv();
 if (!env.databaseUrl) {
