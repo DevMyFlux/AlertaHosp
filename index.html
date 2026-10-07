@@ -1,27 +1,15 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Alerta Hospital</title>
-    <script>
-      window.addEventListener('error', function(e) {
-        if (e.message === 'Script error.' || (e.message && e.message.indexOf('ResizeObserver') !== -1)) {
-          e.stopImmediatePropagation();
-          e.preventDefault();
-        }
-      }, true);
-      window.addEventListener('unhandledrejection', function(e) {
-        if (e.reason && e.reason.message === 'Script error.') {
-          e.stopImmediatePropagation();
-          e.preventDefault();
-        }
-      }, true);
-    </script>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Monitor de Energia</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M18 5 9 18h6l-1 9 9-13h-6z' fill='white'/%3E%3C/svg%3E" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

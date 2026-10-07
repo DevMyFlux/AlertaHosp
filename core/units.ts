@@ -4,8 +4,9 @@
 // na telemetria e classificação. O mesmo registro alimenta: seed do banco,
 // parsing da planilha, API e frontend. Nada de "Hospital Atual".
 
-export const UNIT_CODES = ['HCN', 'HMB'] as const;
-export type UnitCode = (typeof UNIT_CODES)[number];
+import { UNIT_CODES, UNIT_META, isUnitCode, type UnitCode } from './unitMeta.js';
+
+export { UNIT_CODES, isUnitCode, type UnitCode };
 
 export type SectorKind = 'critico' | 'infra' | 'imagem' | 'hvac';
 
@@ -32,6 +33,8 @@ export interface SectorDef {
 export interface UnitDef {
   code: UnitCode;
   name: string;
+  /** cor de identidade da unidade — a mesma no painel, no PDF e no Excel */
+  accent: string;
   timezone: string;
   /** Intervalo esperado entre leituras. HCN = 15 min, HMB = 10 min. */
   expectedIntervalMin: number;
@@ -61,6 +64,7 @@ function sector(
 const HCN: UnitDef = {
   code: 'HCN',
   name: 'HCN',
+  accent: UNIT_META.HCN.accent,
   timezone: TZ,
   expectedIntervalMin: 15,
   sheetCsvUrl:
@@ -94,6 +98,7 @@ const HCN: UnitDef = {
 const HMB: UnitDef = {
   code: 'HMB',
   name: 'HMB',
+  accent: UNIT_META.HMB.accent,
   timezone: TZ,
   expectedIntervalMin: 10,
   sheetCsvUrl:
@@ -123,10 +128,6 @@ const HMB: UnitDef = {
 };
 
 export const UNITS: Record<UnitCode, UnitDef> = { HCN, HMB };
-
-export function isUnitCode(value: unknown): value is UnitCode {
-  return typeof value === 'string' && (UNIT_CODES as readonly string[]).includes(value);
-}
 
 /**
  * Aceita os códigos novos e os apelidos legados (`atual`, `default`, vazio ⇒ HCN)

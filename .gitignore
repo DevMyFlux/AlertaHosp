@@ -11,3 +11,4 @@ coverage/
 # V2: snapshots de dados de produção e config local do assistente (podem conter segredos)
 backups/
 .claude/
+.pglite/

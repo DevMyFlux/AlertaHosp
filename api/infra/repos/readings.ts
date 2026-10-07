@@ -197,12 +197,12 @@ export interface LatestReading {
 }
 
 /** Última leitura de cada setor da unidade. */
-export async function loadLatestReadings(q: Queryable, unitId: number): Promise<LatestReading[]> {
+export async function loadLatestReadings(q: Queryable, unitId: number, since: Date): Promise<LatestReading[]> {
   const res = await q.query<{ sector_id: number; ts: Date; interval_kwh: number | null; status: string; flags: string[] }>(
     `SELECT DISTINCT ON (sector_id) sector_id, ts, interval_kwh, status, flags
-       FROM readings WHERE unit_id = $1 AND ts > now() - interval '3 days'
+       FROM readings WHERE unit_id = $1 AND ts > $2
       ORDER BY sector_id, ts DESC`,
-    [unitId]
+    [unitId, since]
   );
   return res.rows.map(r => ({ sectorId: r.sector_id, ts: new Date(r.ts), intervalKwh: r.interval_kwh, status: r.status, flags: r.flags ?? [] }));
 }

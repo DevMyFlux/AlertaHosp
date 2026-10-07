@@ -56,3 +56,17 @@ export function evaluation(level: Level, over: Partial<Evaluation> = {}): Evalua
     ...over,
   };
 }
+
+/** Extrai o texto de um PDF gerado SEM compressão (pdfkit codifica o texto em hexadecimal WinAnsi). */
+export function pdfText(buf: Buffer): string[] {
+  const raw = buf.toString('latin1');
+  const out: string[] = [];
+  for (const m of raw.matchAll(/\[([^\]]*)\]\s*TJ/g)) {
+    let line = '';
+    for (const h of m[1].matchAll(/<([0-9a-fA-F]*)>/g)) {
+      line += Buffer.from(h[1], 'hex').toString('latin1').replace(/\x97/g, '—').replace(/\x96/g, '–').replace(/\x95/g, '•');
+    }
+    out.push(line);
+  }
+  return out;
+}

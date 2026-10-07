@@ -27,6 +27,8 @@ export interface DigestMessage {
 
 export interface RecipientResult {
   recipientMasked: string;
+  /** id da mensagem na Vonage — liga o retorno assíncrono (webhook) à notificação */
+  messageUuid?: string;
   status: 'success' | 'error';
   channel?: 'whatsapp' | 'sms';
   template?: string;

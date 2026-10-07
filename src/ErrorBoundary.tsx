@@ -1,32 +1,31 @@
-import React, { Component, ErrorInfo, ReactNode } from "react";
-
-interface Props {
-  children?: ReactNode;
-}
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface State {
-  hasError: boolean;
+  error: Error | null;
 }
 
-export class ErrorBoundary extends React.Component<Props, State> {
-  public state: State = {
-    hasError: false
-  };
+/** Falha de renderização vira uma tela útil (e o erro real vai para o console), em vez de tela em branco. */
+export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
+  state: State = { error: null };
 
-  public static getDerivedStateFromError(_: Error): State {
-    // Update state so the next render will show the fallback UI.
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error): State {
+    return { error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Erro de renderização:', error, info.componentStack);
   }
 
-  public render() {
-    if (this.state.hasError) {
-      return <h1>Sorry.. there was an error</h1>;
-    }
-
-    return (this as any).props.children;
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div role="alert" className="mx-auto mt-16 max-w-md rounded-lg border border-line bg-surface p-6 text-center">
+        <h1 className="text-base font-semibold">Algo deu errado ao montar esta tela</h1>
+        <p className="mt-1 text-[13px] text-ink-3">Os dados não foram afetados. Recarregue a página; se persistir, avise o suporte.</p>
+        <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-md border border-line-strong px-3 py-1.5 text-[13px] font-medium hover:bg-surface-2">
+          Recarregar
+        </button>
+      </div>
+    );
   }
 }

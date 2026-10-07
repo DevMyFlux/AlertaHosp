@@ -81,7 +81,7 @@ export class VonageNotifier implements Notifier {
 
       // 1) template específico da unidade (9 variáveis)
       try {
-        await vonage.messages.send(
+        const sent = await vonage.messages.send(
           new WhatsAppTemplate({
             to: phone,
             from: cfg.from!,
@@ -89,7 +89,7 @@ export class VonageNotifier implements Notifier {
             template: { name: `${namespace}:${cfg.templateName}`, parameters: message.params.map(toTemplateParam) },
           })
         );
-        results.push({ recipientMasked, status: 'success', channel: 'whatsapp', template: cfg.templateName });
+        results.push({ recipientMasked, messageUuid: sent?.messageUUID, status: 'success', channel: 'whatsapp', template: cfg.templateName });
         continue;
       } catch (error) {
         whatsappError = `[${cfg.templateName}] ${await extractVonageErrorDetail(error)}`;
@@ -98,7 +98,7 @@ export class VonageNotifier implements Notifier {
 
       // 2) template genérico já comprovado (hora, setor, kWh)
       try {
-        await vonage.messages.send(
+        const sent = await vonage.messages.send(
           new WhatsAppTemplate({
             to: phone,
             from: cfg.from!,
@@ -113,7 +113,7 @@ export class VonageNotifier implements Notifier {
             },
           })
         );
-        results.push({ recipientMasked, status: 'success', channel: 'whatsapp', template: GENERIC_TEMPLATE, whatsappError });
+        results.push({ recipientMasked, messageUuid: sent?.messageUUID, status: 'success', channel: 'whatsapp', template: GENERIC_TEMPLATE, whatsappError });
         continue;
       } catch (error) {
         whatsappError = `${whatsappError} | [${GENERIC_TEMPLATE}] ${await extractVonageErrorDetail(error)}`;

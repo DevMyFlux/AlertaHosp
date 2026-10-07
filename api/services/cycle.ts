@@ -101,7 +101,8 @@ export async function runCycle(deps: CycleDeps, unitCode: UnitCode, options: Cyc
   const runId = await startIngestRun(deps.db, cfg.id, 'sheet');
   let parsed: ParsedSheet;
   try {
-    let limit = options.sheetLimit ?? 300;
+    // sem dados no banco ⇒ primeira carga baixa a planilha inteira; depois só as linhas mais recentes
+    let limit: number | 'all' = options.sheetLimit ?? (state0.lastReadingTs ? 300 : 'all');
     let rows = await deps.source.fetchRows(unit, limit);
     parsed = parseSheetRows(rows, unit);
     const oldestInPage = parsed.samples[0]?.ts;
@@ -251,7 +252,7 @@ async function processInTransaction(
   const normByKey = new Map(normalized.readings.map(n => [`${n.sectorCode}|${n.ts.getTime()}`, n]));
   const outcomes: CycleSectorOutcome[] = [];
   const lastLevel = new Map<string, Evaluation | null>();
-  let latestEvaluatedTs: Date | null = null;
+  let latestEvaluatedTs = null as Date | null;
 
   for (const sector of monitored) {
     const readings = bySector.get(sector.id) ?? [];
