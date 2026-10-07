@@ -90,6 +90,18 @@ export function collectCandidates(
       });
     }
   }
+  // CARONA: se já vai sair uma mensagem desta unidade, os outros alertas ALTO+ abertos e ainda
+  // não avisados entram nela de graça — evita uma segunda mensagem minutos depois quando eles
+  // cruzarem o piso econômico.
+  if (out.length > 0) {
+    const included = new Set(out.map(c => c.sectorCode));
+    for (const o of outcomes) {
+      const open = o.open;
+      if (!open || included.has(o.sectorCode) || open.lastNotifiedAt !== null) continue;
+      if (!reachesThreshold(open.severity, policy.notifyFrom)) continue;
+      out.push({ sectorCode: o.sectorCode, reason: 'opened', severity: open.severity, alert: open, excessKwh: o.lastExcessKwh });
+    }
+  }
   return out;
 }
 

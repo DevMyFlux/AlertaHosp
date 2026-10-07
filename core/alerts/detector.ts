@@ -17,6 +17,8 @@ import type { Level, Severity } from './types.js';
 import { SEVERITIES } from './types.js';
 import type { DayType } from '../time.js';
 
+export type LimitBinding = 'z' | 'pct' | 'min_excess' | 'envelope';
+
 export interface BaselineSnapshot {
   windowKey: string;
   dayType: DayType | 'all';
@@ -48,6 +50,8 @@ export interface Evaluation {
   limits: Record<Severity, number>;
   /** envelope P99 × (1+tol) (kWh) */
   envelope: number;
+  /** qual das 4 condições definiu o limite de cada nível */
+  binding: Record<Severity, LimitBinding>;
   windowKey: string;
   windowName: string;
   dayType: DayType;
@@ -97,14 +101,18 @@ export function evaluateValue(
   const envelope = envelopeBase(baseline, rules.envelope.quantile) * (1 + rules.envelope.tolerance);
 
   const limits = {} as Record<Severity, number>;
+  const binding = {} as Record<Severity, LimitBinding>;
   for (const sev of SEVERITIES) {
     const lv = rules.levels[sev];
-    limits[sev] = Math.max(
-      median + lv.z * mult * sigma,
-      median * (1 + lv.pct * mult),
-      median + minExcess,
-      envelope
-    );
+    const candidates: [LimitBinding, number][] = [
+      ['z', median + lv.z * mult * sigma],
+      ['pct', median * (1 + lv.pct * mult)],
+      ['min_excess', median + minExcess],
+      ['envelope', envelope],
+    ];
+    const [which, limit] = candidates.reduce((best, c) => (c[1] > best[1] ? c : best));
+    limits[sev] = limit;
+    binding[sev] = which;
   }
 
   let level: Level = 'normal';
@@ -126,6 +134,7 @@ export function evaluateValue(
     excessKwh,
     limits,
     envelope,
+    binding,
     windowKey: window.key,
     windowName: window.name,
     dayType,

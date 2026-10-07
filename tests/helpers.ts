@@ -47,6 +47,7 @@ export function evaluation(level: Level, over: Partial<Evaluation> = {}): Evalua
     excessKwh: Math.max(0, value - expected),
     limits: { atencao: 12, alto: 15, critico: 20 },
     envelope: 12,
+    binding: { atencao: 'z', alto: 'z', critico: 'z' },
     windowKey: 'tarde',
     windowName: 'Tarde',
     dayType: 'weekday',

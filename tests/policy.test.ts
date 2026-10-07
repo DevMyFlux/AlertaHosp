@@ -82,6 +82,15 @@ describe('política de notificação', () => {
     assert.equal(collectCandidates([outcome('A', grown, ['breach'])], policy, NOW, FRESH).length, 1);
   });
 
+  test('carona: alertas ALTO+ ainda não avisados entram na mensagem que já vai sair, mesmo abaixo do piso econômico', () => {
+    const big = outcome('A', alert({ totalExcessKwh: 100 }), ['opened']);
+    const small = outcome('B', alert({ totalExcessKwh: 1 }), ['opened']); // sozinho não compensaria
+    const attention = outcome('C', alert({ severity: 'atencao', peakSeverity: 'atencao', totalExcessKwh: 100 }), ['opened']);
+    const c = collectCandidates([big, small, attention], policy, NOW, FRESH);
+    assert.deepEqual(c.map(x => x.sectorCode).sort(), ['A', 'B']);
+    assert.equal(collectCandidates([small], policy, NOW, FRESH).length, 0, 'sem carona, o pequeno não notifica');
+  });
+
   test('dado velho (fonte parada) não gera aviso', () => {
     const c = collectCandidates([outcome('A', alert(), ['opened'])], policy, at(200), at(15));
     assert.equal(c.length, 0);
