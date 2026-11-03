@@ -9,16 +9,56 @@ import { useRemote } from '../lib/hooks';
 import { navigate } from '../lib/router';
 import type { AlertEvent, AlertItem, UnitInfo } from '../lib/types';
 
-const PERIODS = [
+type PeriodChoice = number | 'custom';
+const PERIODS: { value: PeriodChoice; label: string }[] = [
   { value: 7, label: '7 dias' },
   { value: 30, label: '30 dias' },
   { value: 90, label: '90 dias' },
+  { value: 'custom', label: 'Personalizado' },
 ];
 const PAGE = 50;
+const DAY = 86400000;
+
+// dias (AAAA-MM-DD) no fuso das unidades; São Paulo não tem horário de verão desde 2019
+const spMidnight = (day: string) => `${day}T00:00:00-03:00`;
+const nextDay = (day: string) => new Date(new Date(`${day}T12:00:00Z`).getTime() + DAY).toISOString().slice(0, 10);
+const dayBr = (day: string) => day.split('-').reverse().join('/');
+
+/** Intervalo efetivo: `to` exclusivo (meia-noite do dia seguinte) no personalizado; sem `to` nos atalhos (até agora). */
+function resolvePeriod(choice: PeriodChoice, customFrom: string, customTo: string) {
+  if (choice !== 'custom') {
+    const now = Date.now();
+    return {
+      from: new Date(now - choice * DAY).toISOString(), to: undefined as string | undefined,
+      reportFrom: isoDay(new Date(now - choice * DAY)), reportTo: isoDay(new Date(now)),
+      text: `nos últimos ${choice} dias`, menuText: `últimos ${choice} dias`,
+    };
+  }
+  const from = spMidnight(customFrom);
+  const to = spMidnight(nextDay(customTo));
+  const span = customFrom === customTo ? `em ${dayBr(customFrom)}` : `de ${dayBr(customFrom)} a ${dayBr(customTo)}`;
+  return { from, to, reportFrom: from, reportTo: to, text: span, menuText: span.replace(/^em /, '') };
+}
+
+function DateRange({ from, to, max, onChange }: { from: string; to: string; max: string; onChange: (from: string, to: string) => void }) {
+  const input = 'rounded-md border border-line-strong bg-surface px-2 py-1 text-[13px] text-ink outline-none focus:border-[color:var(--unit)]';
+  // datas digitadas fora da ordem empurram a outra ponta, então o intervalo é sempre válido
+  const setFrom = (v: string) => { if (!v) return; const f = v > max ? max : v; onChange(f, f > to ? f : to); };
+  const setTo = (v: string) => { if (!v) return; const t = v > max ? max : v; onChange(t < from ? t : from, t); };
+  return (
+    <div className="flex items-center gap-1.5 text-[13px] text-ink-2">
+      <label className="sr-only" htmlFor="alerts-from">Data inicial</label>
+      <input id="alerts-from" type="date" className={input} value={from} max={max} onChange={e => setFrom(e.target.value)} />
+      <span>até</span>
+      <label className="sr-only" htmlFor="alerts-to">Data final</label>
+      <input id="alerts-to" type="date" className={input} value={to} min={from} max={max} onChange={e => setTo(e.target.value)} />
+    </div>
+  );
+}
 
 // ─── exportação ──────────────────────────────────────────────────────────────────────────────────
 
-function ExportMenu({ unit, days }: { unit: UnitCode; days: number }) {
+function ExportMenu({ unit, from, to, label }: { unit: UnitCode; from: string; to: string; label: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -26,8 +66,6 @@ function ExportMenu({ unit, days }: { unit: UnitCode; days: number }) {
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, []);
-  const to = isoDay(new Date());
-  const from = isoDay(new Date(Date.now() - days * 86400000));
   const items: { label: string; units: UnitCode[]; format: 'xlsx' | 'pdf' }[] = [
     { label: `Excel — ${unit}`, units: [unit], format: 'xlsx' },
     { label: `PDF — ${unit}`, units: [unit], format: 'pdf' },
@@ -39,7 +77,7 @@ function ExportMenu({ unit, days }: { unit: UnitCode; days: number }) {
       <Button onClick={() => setOpen(o => !o)}><Download size={15} />Exportar<ChevronDown size={14} /></Button>
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-72 rounded-md border border-line-strong bg-surface py-1 text-[13px]" style={{ boxShadow: 'var(--shadow-pop)' }} role="menu">
-          <div className="px-3 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">Período: últimos {days} dias</div>
+          <div className="px-3 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">Período: {label}</div>
           {items.map((it, i) => (
             <a key={it.label} role="menuitem" href={reportUrl(it.units, it.format, from, to)} onClick={() => setOpen(false)}
               className={`block px-3 py-2 text-ink no-underline hover:bg-surface-2 ${i === 2 ? 'border-t border-line' : ''}`}>
@@ -167,7 +205,10 @@ const Fact = ({ label, children }: { label: string; children: React.ReactNode })
 // ─── lista ───────────────────────────────────────────────────────────────────────────────────────
 
 export function AlertsPage({ unit, selectedId, info }: { unit: UnitCode; selectedId: number | null; info: UnitInfo | undefined }) {
-  const [days, setDays] = useState(30);
+  const [period, setPeriod] = useState<PeriodChoice>(30);
+  const today = isoDay(new Date());
+  const [customFrom, setCustomFrom] = useState(() => isoDay(new Date(Date.now() - 30 * DAY)));
+  const [customTo, setCustomTo] = useState(today);
   const [status, setStatus] = useState('');
   const [severity, setSeverity] = useState('');
   const [sector, setSector] = useState('');
@@ -175,18 +216,23 @@ export function AlertsPage({ unit, selectedId, info }: { unit: UnitCode; selecte
 
   // trocar de unidade ou de filtro volta para a primeira página; setor de outra unidade não vale
   useEffect(() => { setSector(''); }, [unit]);
-  useEffect(() => { setLimit(PAGE); }, [unit, days, status, severity, sector]);
+  useEffect(() => { setLimit(PAGE); }, [unit, period, customFrom, customTo, status, severity, sector]);
 
-  const from = useMemo(() => new Date(Date.now() - days * 86400000).toISOString(), [days]);
-  const res = useRemote(signal => api.alerts(unit, { from, status: status || undefined, severity: severity || undefined, sector: sector || undefined, limit }, signal), [unit, from, status, severity, sector, limit]);
+  const range = useMemo(() => resolvePeriod(period, customFrom, customTo), [period, customFrom, customTo]);
+  const { from, to } = range;
+  const res = useRemote(signal => api.alerts(unit, { from, to, status: status || undefined, severity: severity || undefined, sector: sector || undefined, limit }, signal), [unit, from, to, status, severity, sector, limit]);
   const items: AlertItem[] = res.data?.items ?? [];
   const sectorOptions = (info?.sectors ?? []).filter(s => s.monitored);
 
   return (
     <>
       <PageTitle unit={unit} title="Alertas"
-        subtitle={res.data ? `${int(res.data.total)} alerta(s) nos últimos ${days} dias` : 'Carregando…'}
-        actions={<><Segmented label="Período" value={days} options={PERIODS} onChange={setDays} /><ExportMenu unit={unit} days={days} /></>} />
+        subtitle={res.data ? `${int(res.data.total)} alerta(s) ${range.text}` : 'Carregando…'}
+        actions={<>
+          <Segmented label="Período" value={period} options={PERIODS} onChange={setPeriod} />
+          {period === 'custom' && <DateRange from={customFrom} to={customTo} max={today} onChange={(f, t) => { setCustomFrom(f); setCustomTo(t); }} />}
+          <ExportMenu unit={unit} from={range.reportFrom} to={range.reportTo} label={range.menuText} />
+        </>} />
 
       <div className="mb-3 flex flex-wrap items-center gap-2 text-[13px]">
         <Select label="Situação" value={status} onChange={setStatus} options={[['', 'Todas as situações'], ['open', 'Em aberto'], ['recovered', 'Recuperados']]} />
